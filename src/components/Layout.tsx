@@ -13,15 +13,16 @@ const Layout: React.FC<LayoutProps> = ({ children, className }) => {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <FadeIn 
+      <main 
         className={cn(
           "flex-1 container mx-auto px-4 py-6 max-w-7xl",
           className
         )}
-        transition={{ duration: 0.4 }}
       >
-        {children}
-      </FadeIn>
+        <FadeIn transition={{ duration: 0.4 }}>
+          {children}
+        </FadeIn>
+      </main>
     </div>
   );
 };
