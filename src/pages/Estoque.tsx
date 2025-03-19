@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { mockProducts } from "@/data/mockData";
-import { Search, Plus, Wine, ChevronDown, ChevronUp, PackagePlus, Trash2, Pencil } from "lucide-react";
+import { Search, Plus, Wine, ChevronDown, ChevronUp, Trash2, Pencil } from "lucide-react";
 import { FadeIn, SlideInFromBottom } from "@/components/ui/motion";
 import AdicionarProdutoModal from "@/components/estoque/AdicionarProdutoModal";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -25,6 +25,7 @@ interface Product {
   currentStock: number;
   minimumStock: number;
   price: number;
+  costPrice?: number;
 }
 
 const Estoque = () => {
@@ -58,6 +59,12 @@ const Estoque = () => {
       return sortConfig.direction === 'asc'
         ? a.price - b.price
         : b.price - a.price;
+    } else if (sortConfig.key === 'costPrice') {
+      const aCost = a.costPrice || 0;
+      const bCost = b.costPrice || 0;
+      return sortConfig.direction === 'asc'
+        ? aCost - bCost
+        : bCost - aCost;
     }
     return 0;
   });
@@ -90,6 +97,12 @@ const Estoque = () => {
   const getSortIcon = (key: string) => {
     if (sortConfig.key !== key) return null;
     return sortConfig.direction === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
+  };
+
+  const calculateProfitMargin = (product: Product) => {
+    if (!product.costPrice) return null;
+    const margin = ((product.price - product.costPrice) / product.costPrice) * 100;
+    return margin.toFixed(1);
   };
 
   return (
@@ -159,10 +172,10 @@ const Estoque = () => {
                           </TableHead>
                           <TableHead 
                             className="cursor-pointer font-medium"
-                            onClick={() => handleSort('currentStock')}
+                            onClick={() => handleSort('costPrice')}
                           >
                             <div className="flex items-center">
-                              Estoque {getSortIcon('currentStock')}
+                              Custo {getSortIcon('costPrice')}
                             </div>
                           </TableHead>
                           <TableHead 
@@ -171,6 +184,17 @@ const Estoque = () => {
                           >
                             <div className="flex items-center">
                               Preço {getSortIcon('price')}
+                            </div>
+                          </TableHead>
+                          <TableHead className="font-medium">
+                            Margem
+                          </TableHead>
+                          <TableHead 
+                            className="cursor-pointer font-medium"
+                            onClick={() => handleSort('currentStock')}
+                          >
+                            <div className="flex items-center">
+                              Estoque {getSortIcon('currentStock')}
                             </div>
                           </TableHead>
                           <TableHead className="font-medium">
@@ -195,15 +219,21 @@ const Estoque = () => {
                               </TableCell>
                               <TableCell>{product.category}</TableCell>
                               <TableCell>
+                                {product.costPrice ? `R$ ${product.costPrice.toFixed(2)}` : "-"}
+                              </TableCell>
+                              <TableCell>
+                                R$ {product.price.toFixed(2)}
+                              </TableCell>
+                              <TableCell>
+                                {calculateProfitMargin(product) ? `${calculateProfitMargin(product)}%` : "-"}
+                              </TableCell>
+                              <TableCell>
                                 <div className="flex items-center">
                                   {product.currentStock}
                                   <span className="text-xs text-muted-foreground ml-1">
                                     / {product.minimumStock} min
                                   </span>
                                 </div>
-                              </TableCell>
-                              <TableCell>
-                                R$ {product.price.toFixed(2)}
                               </TableCell>
                               <TableCell>
                                 {product.currentStock <= product.minimumStock ? (
@@ -233,7 +263,7 @@ const Estoque = () => {
                           ))
                         ) : (
                           <TableRow>
-                            <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                            <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                               Nenhum produto encontrado.
                             </TableCell>
                           </TableRow>
