@@ -98,7 +98,7 @@ const Navbar: React.FC = () => {
         <div className="flex items-center gap-2">
           <Wine className="h-8 w-8 text-primary" />
           <h1 className="text-xl font-display font-medium">
-            <span className="text-primary">Bebidas</span>Manager
+            <span className="text-primary">Robinho</span>Whiskeria
           </h1>
         </div>
 
