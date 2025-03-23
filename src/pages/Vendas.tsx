@@ -25,6 +25,7 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { FadeIn, SlideInFromBottom, StaggeredContainer } from "@/components/ui/motion";
+import { toast } from "sonner";
 
 interface CartItem {
   id: string;
@@ -36,13 +37,26 @@ interface CartItem {
 const Vendas = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [products, setProducts] = useState(mockProducts);
+  const [sales, setSales] = useState(mockSales);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Filter products based on search
-  const filteredProducts = mockProducts.filter(product => 
+  const filteredProducts = products.filter(product => 
     product.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const addToCart = (product: any) => {
+    // Check if we have enough stock
+    const currentProduct = products.find(p => p.id === product.id);
+    const existingCartItem = cart.find(item => item.id === product.id);
+    const currentCartQuantity = existingCartItem ? existingCartItem.quantity : 0;
+    
+    if (currentProduct && currentProduct.currentStock <= currentCartQuantity) {
+      toast.error(`Estoque insuficiente para ${product.name}`);
+      return;
+    }
+    
     setCart(prevCart => {
       const existingItem = prevCart.find(item => item.id === product.id);
       
@@ -64,6 +78,17 @@ const Vendas = () => {
   };
 
   const updateQuantity = (id: string, change: number) => {
+    const item = cart.find(item => item.id === id);
+    if (!item) return;
+    
+    const currentProduct = products.find(p => p.id === id);
+    
+    // Check if trying to increment beyond available stock
+    if (change > 0 && currentProduct && item.quantity >= currentProduct.currentStock) {
+      toast.error(`Estoque insuficiente para ${item.name}`);
+      return;
+    }
+    
     setCart(prevCart => 
       prevCart.map(item => 
         item.id === id 
@@ -83,6 +108,64 @@ const Vendas = () => {
 
   const calculateTotal = () => {
     return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+  };
+  
+  const finalizeOrder = () => {
+    if (cart.length === 0) return;
+    
+    setIsProcessing(true);
+    
+    try {
+      // Check if we have enough stock for all items
+      const notEnoughStock = cart.some(item => {
+        const product = products.find(p => p.id === item.id);
+        return product ? product.currentStock < item.quantity : true;
+      });
+      
+      if (notEnoughStock) {
+        toast.error("Alguns produtos não têm estoque suficiente");
+        setIsProcessing(false);
+        return;
+      }
+      
+      // Update stock
+      const updatedProducts = products.map(product => {
+        const cartItem = cart.find(item => item.id === product.id);
+        if (cartItem) {
+          return {
+            ...product,
+            currentStock: product.currentStock - cartItem.quantity
+          };
+        }
+        return product;
+      });
+      
+      // Create new sale
+      const newSale = {
+        id: `s${sales.length + 1}`,
+        customer: "Cliente",
+        date: new Date(),
+        totalAmount: calculateTotal(),
+        items: cart.map(item => ({
+          id: `i${Math.random().toString(36).substring(2, 9)}`,
+          product: item.name,
+          quantity: item.quantity,
+          price: item.price,
+        }))
+      };
+      
+      // Update state
+      setProducts(updatedProducts);
+      setSales([newSale, ...sales]);
+      
+      toast.success("Venda finalizada com sucesso!");
+      clearCart();
+    } catch (error) {
+      toast.error("Erro ao finalizar venda");
+      console.error(error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -131,8 +214,8 @@ const Vendas = () => {
                           {filteredProducts.map(product => (
                             <FadeIn key={product.id}>
                               <Card 
-                                className="hover:scale-[1.02] transition-transform overflow-hidden cursor-pointer h-full flex flex-col"
-                                onClick={() => addToCart(product)}
+                                className={`hover:scale-[1.02] transition-transform overflow-hidden cursor-pointer h-full flex flex-col ${product.currentStock === 0 ? 'opacity-50' : ''}`}
+                                onClick={() => product.currentStock > 0 ? addToCart(product) : toast.error(`Sem estoque para ${product.name}`)}
                               >
                                 <div className="h-24 bg-primary/10 flex items-center justify-center">
                                   <ShoppingCart className="h-8 w-8 text-primary/70" />
@@ -241,9 +324,10 @@ const Vendas = () => {
                         <Button 
                           className="w-full" 
                           size="lg"
-                          disabled={cart.length === 0}
+                          disabled={cart.length === 0 || isProcessing}
+                          onClick={finalizeOrder}
                         >
-                          Finalizar Venda
+                          {isProcessing ? "Processando..." : "Finalizar Venda"}
                         </Button>
                       </div>
                     </div>
@@ -267,7 +351,7 @@ const Vendas = () => {
                     </TableHeader>
                     <TableBody>
                       <StaggeredContainer staggerDelay={0.05}>
-                        {mockSales.map((sale) => (
+                        {sales.map((sale) => (
                           <FadeIn key={sale.id}>
                             <TableRow className="hover:bg-muted/30">
                               <TableCell className="font-medium">{sale.customer}</TableCell>
