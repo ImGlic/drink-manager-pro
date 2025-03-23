@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -125,8 +126,8 @@ const Vendas = () => {
                       </div>
                     </div>
                     <CardContent className="p-0 overflow-auto" style={{ maxHeight: '60vh' }}>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
-                        <StaggeredContainer staggerDelay={0.05}>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
+                        <StaggeredContainer className="contents" staggerDelay={0.05}>
                           {filteredProducts.map(product => (
                             <FadeIn key={product.id}>
                               <Card 
