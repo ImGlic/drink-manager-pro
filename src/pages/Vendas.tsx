@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -126,18 +125,18 @@ const Vendas = () => {
                       </div>
                     </div>
                     <CardContent className="p-0 overflow-auto" style={{ maxHeight: '60vh' }}>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
                         <StaggeredContainer staggerDelay={0.05}>
                           {filteredProducts.map(product => (
                             <FadeIn key={product.id}>
                               <Card 
-                                className="hover-scale overflow-hidden cursor-pointer h-full"
+                                className="hover:scale-[1.02] transition-transform overflow-hidden cursor-pointer h-full flex flex-col"
                                 onClick={() => addToCart(product)}
                               >
                                 <div className="h-24 bg-primary/10 flex items-center justify-center">
                                   <ShoppingCart className="h-8 w-8 text-primary/70" />
                                 </div>
-                                <CardContent className="p-3 flex flex-col">
+                                <CardContent className="p-3 flex flex-col flex-grow">
                                   <div className="space-y-1 flex-1">
                                     <h3 className="font-medium text-sm leading-tight line-clamp-2">{product.name}</h3>
                                     <div className="flex justify-between items-center mt-2">
@@ -301,4 +300,3 @@ const Vendas = () => {
 };
 
 export default Vendas;
-
