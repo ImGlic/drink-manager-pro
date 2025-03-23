@@ -10,15 +10,20 @@ import { mockProducts, mockSales } from "@/data/mockData";
 import { 
   ShoppingCart, 
   Search, 
-  Plus, 
   Trash2, 
   MinusCircle, 
   PlusCircle,
   Receipt,
-  Clock,
-  CheckCircle2,
-  XCircle
+  CheckCircle2
 } from "lucide-react";
+import { 
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
 import { FadeIn, SlideInFromBottom, StaggeredContainer } from "@/components/ui/motion";
 
 interface CartItem {
@@ -126,16 +131,16 @@ const Vendas = () => {
                           {filteredProducts.map(product => (
                             <FadeIn key={product.id}>
                               <Card 
-                                className="hover-scale overflow-hidden cursor-pointer"
+                                className="hover-scale overflow-hidden cursor-pointer h-full"
                                 onClick={() => addToCart(product)}
                               >
                                 <div className="h-24 bg-primary/10 flex items-center justify-center">
                                   <ShoppingCart className="h-8 w-8 text-primary/70" />
                                 </div>
-                                <CardContent className="p-3">
-                                  <div className="space-y-1">
+                                <CardContent className="p-3 flex flex-col">
+                                  <div className="space-y-1 flex-1">
                                     <h3 className="font-medium text-sm leading-tight line-clamp-2">{product.name}</h3>
-                                    <div className="flex justify-between items-center">
+                                    <div className="flex justify-between items-center mt-2">
                                       <p className="text-sm font-semibold">R$ {product.price.toFixed(2)}</p>
                                       <Badge 
                                         variant={product.currentStock <= product.minimumStock ? "destructive" : "outline"}
@@ -250,43 +255,41 @@ const Vendas = () => {
             <TabsContent value="historico" className="m-0">
               <Card>
                 <CardContent className="p-0">
-                  <div className="relative overflow-x-auto rounded-md">
-                    <table className="w-full text-sm text-left">
-                      <thead className="text-xs text-muted-foreground bg-muted/50 uppercase">
-                        <tr>
-                          <th scope="col" className="px-6 py-3">Cliente</th>
-                          <th scope="col" className="px-6 py-3">Data</th>
-                          <th scope="col" className="px-6 py-3">Itens</th>
-                          <th scope="col" className="px-6 py-3">Total</th>
-                          <th scope="col" className="px-6 py-3">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <StaggeredContainer staggerDelay={0.05}>
-                          {mockSales.map((sale) => (
-                            <FadeIn key={sale.id} className="section-transition hover:bg-muted/30">
-                              <tr>
-                                <td className="px-6 py-4 font-medium">{sale.customer}</td>
-                                <td className="px-6 py-4">
-                                  {new Date(sale.date).toLocaleDateString('pt-BR')}
-                                </td>
-                                <td className="px-6 py-4">{sale.items.length}</td>
-                                <td className="px-6 py-4 font-semibold">
-                                  R$ {sale.totalAmount.toFixed(2)}
-                                </td>
-                                <td className="px-6 py-4">
-                                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                                    Concluída
-                                  </Badge>
-                                </td>
-                              </tr>
-                            </FadeIn>
-                          ))}
-                        </StaggeredContainer>
-                      </tbody>
-                    </table>
-                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Itens</TableHead>
+                        <TableHead>Total</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <StaggeredContainer staggerDelay={0.05}>
+                        {mockSales.map((sale) => (
+                          <FadeIn key={sale.id}>
+                            <TableRow className="hover:bg-muted/30">
+                              <TableCell className="font-medium">{sale.customer}</TableCell>
+                              <TableCell>
+                                {new Date(sale.date).toLocaleDateString('pt-BR')}
+                              </TableCell>
+                              <TableCell>{sale.items.length}</TableCell>
+                              <TableCell className="font-semibold">
+                                R$ {sale.totalAmount.toFixed(2)}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  Concluída
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          </FadeIn>
+                        ))}
+                      </StaggeredContainer>
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -298,3 +301,4 @@ const Vendas = () => {
 };
 
 export default Vendas;
+
