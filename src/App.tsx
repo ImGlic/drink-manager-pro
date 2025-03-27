@@ -4,6 +4,9 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/context/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import Login from "@/pages/Login";
 import Index from "./pages/Index";
 import Estoque from "./pages/Estoque";
 import Vendas from "./pages/Vendas";
@@ -17,17 +20,53 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <TooltipProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/estoque" element={<Estoque />} />
-            <Route path="/vendas" element={<Vendas />} />
-            <Route path="/configuracoes" element={<Configuracoes />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <Toaster />
-          <Sonner />
-        </TooltipProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              
+              <Route 
+                path="/" 
+                element={
+                  <ProtectedRoute requiredPermission="dashboard">
+                    <Index />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              <Route 
+                path="/estoque" 
+                element={
+                  <ProtectedRoute requiredPermission="estoque">
+                    <Estoque />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              <Route 
+                path="/vendas" 
+                element={
+                  <ProtectedRoute requiredPermission="vendas">
+                    <Vendas />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              <Route 
+                path="/configuracoes" 
+                element={
+                  <ProtectedRoute requiredPermission="configuracoes">
+                    <Configuracoes />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <Toaster />
+            <Sonner />
+          </TooltipProvider>
+        </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
   );

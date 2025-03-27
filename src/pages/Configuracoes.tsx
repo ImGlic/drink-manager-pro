@@ -1,36 +1,56 @@
-
-import React, { useState } from "react";
-import Layout from "@/components/Layout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import React, { useState, useEffect } from "react";
+import { v4 as uuidv4 } from 'uuid';
+import { toast } from "sonner";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { SlideInFromBottom, FadeIn } from "@/components/ui/motion";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { Edit, Trash2, UserPlus, UserCog, Shield, KeyRound, Plus, X } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Form } from "@/components/ui/form"
 
-// Tipos de perfil e permissões
+// Define the types
 interface Perfil {
   id: string;
   nome: string;
   descricao: string;
+  permissoes: string[];
+}
+
+interface Usuario {
+  id: string;
+  nome: string;
+  email: string;
+  senha: string;
+  cpf: string;
+  perfil: Perfil;
 }
 
 interface Permissao {
@@ -39,769 +59,502 @@ interface Permissao {
   descricao: string;
 }
 
-interface Usuario {
-  id: string;
-  nome: string;
-  email: string;
-  cpf: string;
-  perfilId: string;
-}
+const Configuracoes: React.FC = () => {
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [perfis, setPerfis] = useState<Perfil[]>([]);
+  const [permissoes, setPermissoes] = useState<Permissao[]>([]);
 
-const Configuracoes = () => {
-  const { toast } = useToast();
-  const [activeUserTab, setActiveUserTab] = useState<string>("usuarios");
-  const [perfis, setPerfis] = useState<Perfil[]>([
-    { id: "1", nome: "Gerente", descricao: "Acesso completo ao sistema" },
-    { id: "2", nome: "Caixa", descricao: "Acesso apenas às vendas e consulta de estoque" },
-  ]);
-
-  const [permissoes, setPermissoes] = useState<Permissao[]>([
-    { id: "1", nome: "dashboard", descricao: "Acesso ao Dashboard" },
-    { id: "2", nome: "estoque", descricao: "Acesso ao Estoque" },
-    { id: "3", nome: "vendas", descricao: "Acesso às Vendas" },
-    { id: "4", nome: "configuracoes", descricao: "Acesso às Configurações" },
-  ]);
-
-  const [usuarios, setUsuarios] = useState<Usuario[]>([
-    { id: "1", nome: "Admin", email: "admin@bebidas.com", cpf: "123.456.789-00", perfilId: "1" },
-  ]);
-
-  const [perfilPermissoes, setPerfilPermissoes] = useState<Record<string, string[]>>({
-    "1": ["1", "2", "3", "4"], // Gerente tem todas as permissões
-    "2": ["1", "2", "3"], // Caixa não tem acesso às configurações
-  });
-
-  const [editingPerfil, setEditingPerfil] = useState<Perfil | null>(null);
-  const [editingUsuario, setEditingUsuario] = useState<Usuario | null>(null);
-  const [showPerfilForm, setShowPerfilForm] = useState(false);
   const [showUsuarioForm, setShowUsuarioForm] = useState(false);
+  const [showPerfilForm, setShowPerfilForm] = useState(false);
+  const [showPermissaoForm, setShowPermissaoForm] = useState(false);
 
-  // Esquema de validação para o formulário de perfil
-  const perfilSchema = z.object({
-    nome: z.string().min(2, { message: "Nome deve ter pelo menos 2 caracteres" }),
-    descricao: z.string().min(5, { message: "Descrição deve ter pelo menos 5 caracteres" })
-  });
+  const [nomeUsuario, setNomeUsuario] = useState("");
+  const [emailUsuario, setEmailUsuario] = useState("");
+  const [senhaUsuario, setSenhaUsuario] = useState("");
+  const [cpfUsuario, setCpfUsuario] = useState("");
+  const [perfilUsuario, setPerfilUsuario] = useState<string | undefined>("");
+  const [usuarioEmEdicao, setUsuarioEmEdicao] = useState<Usuario | null>(null);
 
-  // Esquema de validação para o formulário de usuário
-  const usuarioSchema = z.object({
-    nome: z.string().min(2, { message: "Nome deve ter pelo menos 2 caracteres" }),
-    email: z.string().email({ message: "Email inválido" }),
-    cpf: z.string().regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, { message: "CPF inválido (formato: 123.456.789-00)" }),
-    senha: z.string().min(6, { message: "Senha deve ter pelo menos 6 caracteres" }),
-    perfilId: z.string({ required_error: "Selecione um perfil" })
-  });
+  const [nomePerfil, setNomePerfil] = useState("");
+  const [descricaoPerfil, setDescricaoPerfil] = useState("");
+  const [permissoesSelecionadas, setPermissoesSelecionadas] = useState<string[]>([]);
+  const [perfilEmEdicao, setPerfilEmEdicao] = useState<Perfil | null>(null);
 
-  // Formulário de perfil
-  const perfilForm = useForm<z.infer<typeof perfilSchema>>({
-    resolver: zodResolver(perfilSchema),
-    defaultValues: {
-      nome: "",
-      descricao: ""
+  const [nomePermissao, setNomePermissao] = useState("");
+  const [descricaoPermissao, setDescricaoPermissao] = useState("");
+  const [permissaoEmEdicao, setPermissaoEmEdicao] = useState<Permissao | null>(null);
+
+  useEffect(() => {
+    // Load data from localStorage
+    const storedUsuarios = localStorage.getItem("usuarios");
+    if (storedUsuarios) {
+      setUsuarios(JSON.parse(storedUsuarios));
     }
-  });
 
-  // Formulário de usuário
-  const usuarioForm = useForm<z.infer<typeof usuarioSchema>>({
-    resolver: zodResolver(usuarioSchema),
-    defaultValues: {
-      nome: "",
-      email: "",
-      cpf: "",
-      senha: "",
-      perfilId: ""
+    const storedPerfis = localStorage.getItem("perfis");
+    if (storedPerfis) {
+      setPerfis(JSON.parse(storedPerfis));
     }
-  });
 
-  // Funções para manipulação de perfis
-  const handlePerfilSubmit = (values: z.infer<typeof perfilSchema>) => {
-    if (editingPerfil) {
-      setPerfis(perfis.map(p => p.id === editingPerfil.id ? { ...p, ...values } : p));
-      toast({
-        title: "Perfil atualizado",
-        description: `O perfil ${values.nome} foi atualizado com sucesso.`
-      });
-    } else {
-      const newPerfil = {
-        id: Date.now().toString(),
-        ...values
-      };
-      setPerfis([...perfis, newPerfil]);
-      setPerfilPermissoes({
-        ...perfilPermissoes,
-        [newPerfil.id]: []
-      });
-      toast({
-        title: "Perfil criado",
-        description: `O perfil ${values.nome} foi criado com sucesso.`
-      });
+    const storedPermissoes = localStorage.getItem("permissoes");
+    if (storedPermissoes) {
+      setPermissoes(JSON.parse(storedPermissoes));
     }
-    setEditingPerfil(null);
-    setShowPerfilForm(false);
-    perfilForm.reset();
-  };
+  }, []);
 
-  const handleEditPerfil = (perfil: Perfil) => {
-    setEditingPerfil(perfil);
-    perfilForm.reset({
-      nome: perfil.nome,
-      descricao: perfil.descricao
-    });
-    setShowPerfilForm(true);
-  };
+  useEffect(() => {
+    // Save data to localStorage
+    localStorage.setItem("usuarios", JSON.stringify(usuarios));
+    localStorage.setItem("perfis", JSON.stringify(perfis));
+    localStorage.setItem("permissoes", JSON.stringify(permissoes));
+  }, [usuarios, perfis, permissoes]);
 
-  const handleDeletePerfil = (id: string) => {
-    // Verificar se há usuários com este perfil
-    const usuariosComPerfil = usuarios.filter(u => u.perfilId === id);
-    if (usuariosComPerfil.length > 0) {
-      toast({
-        title: "Não é possível excluir",
-        description: "Existem usuários vinculados a este perfil.",
-        variant: "destructive"
-      });
+  const handleSaveUsuario = () => {
+    if (!nomeUsuario || !emailUsuario || !senhaUsuario || !cpfUsuario || !perfilUsuario) {
+      toast.error("Todos os campos são obrigatórios!");
       return;
     }
-    
-    setPerfis(perfis.filter(p => p.id !== id));
-    const newPerfilPermissoes = { ...perfilPermissoes };
-    delete newPerfilPermissoes[id];
-    setPerfilPermissoes(newPerfilPermissoes);
-    toast({
-      title: "Perfil excluído",
-      description: "O perfil foi excluído com sucesso."
+
+    const selectedPerfil = perfis.find((perfil) => perfil.id === perfilUsuario);
+
+    if (!selectedPerfil) {
+      toast.error("Perfil selecionado inválido!");
+      return;
+    }
+
+    const newUsuario: Usuario = {
+      id: usuarioEmEdicao ? usuarioEmEdicao.id : uuidv4(),
+      nome: nomeUsuario,
+      email: emailUsuario,
+      senha: senhaUsuario,
+      cpf: cpfUsuario,
+      perfil: selectedPerfil,
+    };
+
+    setUsuarios((prev) => {
+      if (usuarioEmEdicao) {
+        return prev.map((u) => (u.id === usuarioEmEdicao.id ? newUsuario : u));
+      } else {
+        return [...prev, newUsuario];
+      }
     });
-  };
 
-  // Funções para manipulação de permissões
-  const togglePermissao = (perfilId: string, permissaoId: string) => {
-    const currentPermissions = perfilPermissoes[perfilId] || [];
-    if (currentPermissions.includes(permissaoId)) {
-      setPerfilPermissoes({
-        ...perfilPermissoes,
-        [perfilId]: currentPermissions.filter(id => id !== permissaoId)
-      });
-    } else {
-      setPerfilPermissoes({
-        ...perfilPermissoes,
-        [perfilId]: [...currentPermissions, permissaoId]
-      });
-    }
-  };
-
-  // Funções para manipulação de usuários
-  const handleUsuarioSubmit = (values: z.infer<typeof usuarioSchema>) => {
-    if (editingUsuario) {
-      setUsuarios(usuarios.map(u => u.id === editingUsuario.id ? { ...u, nome: values.nome, email: values.email, cpf: values.cpf, perfilId: values.perfilId } : u));
-      toast({
-        title: "Usuário atualizado",
-        description: `O usuário ${values.nome} foi atualizado com sucesso.`
-      });
-    } else {
-      const newUsuario = {
-        id: Date.now().toString(),
-        nome: values.nome,
-        email: values.email,
-        cpf: values.cpf,
-        perfilId: values.perfilId
-      };
-      setUsuarios([...usuarios, newUsuario]);
-      toast({
-        title: "Usuário criado",
-        description: `O usuário ${values.nome} foi criado com sucesso.`
-      });
-    }
-    setEditingUsuario(null);
+    // Reset the form
+    setNomeUsuario("");
+    setEmailUsuario("");
+    setSenhaUsuario("");
+    setCpfUsuario("");
+    setPerfilUsuario(undefined);
+    setUsuarioEmEdicao(null);
     setShowUsuarioForm(false);
-    usuarioForm.reset();
+    toast.success(`Usuário ${usuarioEmEdicao ? "atualizado" : "criado"} com sucesso!`);
+  };
+
+  const handleSavePerfil = () => {
+    if (!nomePerfil) {
+      toast.error("O nome do perfil é obrigatório!");
+      return;
+    }
+
+    const newPerfil: Perfil = {
+      id: perfilEmEdicao ? perfilEmEdicao.id : uuidv4(),
+      nome: nomePerfil,
+      descricao: descricaoPerfil || "",
+      permissoes: permissoesSelecionadas
+    };
+
+    // Make sure we're explicitly setting the new Perfil type
+    setPerfis((prev) => {
+      if (perfilEmEdicao) {
+        return prev.map((p) => (p.id === perfilEmEdicao.id ? newPerfil : p));
+      } else {
+        return [...prev, newPerfil];
+      }
+    });
+
+    // Reset the form
+    setNomePerfil("");
+    setDescricaoPerfil("");
+    setPermissoesSelecionadas([]);
+    setPerfilEmEdicao(null);
+    setShowPerfilForm(false);
+    toast.success(`Perfil ${perfilEmEdicao ? "atualizado" : "criado"} com sucesso!`);
+  };
+
+  const handleSavePermissao = () => {
+    if (!nomePermissao) {
+      toast.error("O nome da permissão é obrigatório!");
+      return;
+    }
+
+    const newPermissao: Permissao = {
+      id: permissaoEmEdicao ? permissaoEmEdicao.id : uuidv4(),
+      nome: nomePermissao,
+      descricao: descricaoPermissao || "",
+    };
+
+    setPermissoes((prev) => {
+      if (permissaoEmEdicao) {
+        return prev.map((p) => (p.id === permissaoEmEdicao.id ? newPermissao : p));
+      } else {
+        return [...prev, newPermissao];
+      }
+    });
+
+    // Reset the form
+    setNomePermissao("");
+    setDescricaoPermissao("");
+    setPermissaoEmEdicao(null);
+    setShowPermissaoForm(false);
+    toast.success(`Permissão ${permissaoEmEdicao ? "atualizada" : "criada"} com sucesso!`);
   };
 
   const handleEditUsuario = (usuario: Usuario) => {
-    setEditingUsuario(usuario);
-    usuarioForm.reset({
-      nome: usuario.nome,
-      email: usuario.email,
-      cpf: usuario.cpf,
-      senha: "",
-      perfilId: usuario.perfilId
-    });
+    setUsuarioEmEdicao(usuario);
+    setNomeUsuario(usuario.nome);
+    setEmailUsuario(usuario.email);
+    setSenhaUsuario(usuario.senha);
+    setCpfUsuario(usuario.cpf);
+    setPerfilUsuario(usuario.perfil.id);
     setShowUsuarioForm(true);
   };
 
+  const handleEditPerfil = (perfil: Perfil) => {
+    setPerfilEmEdicao(perfil);
+    setNomePerfil(perfil.nome);
+    setDescricaoPerfil(perfil.descricao);
+    setPermissoesSelecionadas(perfil.permissoes);
+    setShowPerfilForm(true);
+  };
+
+  const handleEditPermissao = (permissao: Permissao) => {
+    setPermissaoEmEdicao(permissao);
+    setNomePermissao(permissao.nome);
+    setDescricaoPermissao(permissao.descricao);
+    setShowPermissaoForm(true);
+  };
+
   const handleDeleteUsuario = (id: string) => {
-    setUsuarios(usuarios.filter(u => u.id !== id));
-    toast({
-      title: "Usuário excluído",
-      description: "O usuário foi excluído com sucesso."
+    setUsuarios((prev) => prev.filter((u) => u.id !== id));
+    toast.success("Usuário excluído com sucesso!");
+  };
+
+  const handleDeletePerfil = (id: string) => {
+    setPerfis((prev) => prev.filter((p) => p.id !== id));
+    // Also update usuarios to remove the perfil
+    setUsuarios((prev) =>
+      prev.map((usuario) =>
+        usuario.perfil.id === id ? { ...usuario, perfil: { ...usuario.perfil, id: "", nome: "Sem perfil", descricao: "", permissoes: [] } } : usuario
+      )
+    );
+    toast.success("Perfil excluído com sucesso!");
+  };
+
+  const handleDeletePermissao = (id: string) => {
+    setPermissoes((prev) => prev.filter((p) => p.id !== id));
+    // Also update perfis to remove the permissao
+    setPerfis((prev) =>
+      prev.map((perfil) => ({
+        ...perfil,
+        permissoes: perfil.permissoes.filter((permissaoId) => permissaoId !== id),
+      }))
+    );
+    toast.success("Permissão excluída com sucesso!");
+  };
+
+  const togglePermissao = (permissaoId: string) => {
+    setPermissoesSelecionadas((prev) => {
+      if (prev.includes(permissaoId)) {
+        return prev.filter((id) => id !== permissaoId);
+      } else {
+        return [...prev, permissaoId];
+      }
     });
   };
 
   return (
-    <Layout>
-      <div className="space-y-6">
-        <SlideInFromBottom>
-          <div>
-            <h2 className="text-3xl font-display font-semibold tracking-tight">Configurações</h2>
-            <p className="text-muted-foreground">
-              Personalize o sistema de acordo com as necessidades da sua loja
-            </p>
+    <div className="container max-w-7xl mx-auto p-4">
+      <h1 className="text-2xl font-semibold mb-4">Configurações</h1>
+
+      {/* Usuários */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-semibold">Usuários</h2>
+          <Button size="sm" onClick={() => setShowUsuarioForm(true)}>
+            Adicionar Usuário
+          </Button>
+        </div>
+
+        <Table>
+          <TableCaption>Lista de usuários cadastrados no sistema.</TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[100px]">ID</TableHead>
+              <TableHead>Nome</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>CPF</TableHead>
+              <TableHead>Perfil</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {usuarios.map((usuario) => (
+              <TableRow key={usuario.id}>
+                <TableCell className="font-medium">{usuario.id}</TableCell>
+                <TableCell>{usuario.nome}</TableCell>
+                <TableCell>{usuario.email}</TableCell>
+                <TableCell>{usuario.cpf}</TableCell>
+                <TableCell>{usuario.perfil.nome}</TableCell>
+                <TableCell className="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Abrir menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => handleEditUsuario(usuario)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        <span>Editar</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDeleteUsuario(usuario.id)}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        <span>Excluir</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </section>
+
+      {/* Perfis */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-semibold">Perfis</h2>
+          <Button size="sm" onClick={() => setShowPerfilForm(true)}>
+            Adicionar Perfil
+          </Button>
+        </div>
+
+        <Table>
+          <TableCaption>Lista de perfis cadastrados no sistema.</TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[100px]">ID</TableHead>
+              <TableHead>Nome</TableHead>
+              <TableHead>Descrição</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {perfis.map((perfil) => (
+              <TableRow key={perfil.id}>
+                <TableCell className="font-medium">{perfil.id}</TableCell>
+                <TableCell>{perfil.nome}</TableCell>
+                <TableCell>{perfil.descricao}</TableCell>
+                <TableCell className="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Abrir menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => handleEditPerfil(perfil)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        <span>Editar</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDeletePerfil(perfil.id)}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        <span>Excluir</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </section>
+
+      {/* Permissões */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-semibold">Permissões</h2>
+          <Button size="sm" onClick={() => setShowPermissaoForm(true)}>
+            Adicionar Permissão
+          </Button>
+        </div>
+
+        <Table>
+          <TableCaption>Lista de permissões cadastradas no sistema.</TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[100px]">ID</TableHead>
+              <TableHead>Nome</TableHead>
+              <TableHead>Descrição</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {permissoes.map((permissao) => (
+              <TableRow key={permissao.id}>
+                <TableCell className="font-medium">{permissao.id}</TableCell>
+                <TableCell>{permissao.nome}</TableCell>
+                <TableCell>{permissao.descricao}</TableCell>
+                <TableCell className="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Abrir menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => handleEditPermissao(permissao)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        <span>Editar</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDeletePermissao(permissao.id)}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        <span>Excluir</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </section>
+
+      {/* Usuário Sheet */}
+      <Sheet open={showUsuarioForm} onOpenChange={setShowUsuarioForm}>
+        <SheetTrigger asChild>
+          <Button>Open Sheet</Button>
+        </SheetTrigger>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>{usuarioEmEdicao ? "Editar Usuário" : "Adicionar Usuário"}</SheetTitle>
+            <SheetDescription>
+              Preencha os campos abaixo para {usuarioEmEdicao ? "editar" : "criar"} um usuário.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Nome</Label>
+              <Input id="name" value={nomeUsuario} onChange={(e) => setNomeUsuario(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" value={emailUsuario} onChange={(e) => setEmailUsuario(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="senha">Senha</Label>
+              <Input id="senha" type="password" value={senhaUsuario} onChange={(e) => setSenhaUsuario(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="cpf">CPF</Label>
+              <Input id="cpf" value={cpfUsuario} onChange={(e) => setCpfUsuario(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="perfil">Perfil</Label>
+              <select
+                id="perfil"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={perfilUsuario}
+                onChange={(e) => setPerfilUsuario(e.target.value)}
+              >
+                <option value="">Selecione um perfil</option>
+                {perfis.map((perfil) => (
+                  <option key={perfil.id} value={perfil.id}>
+                    {perfil.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        </SlideInFromBottom>
+          <Button onClick={handleSaveUsuario}>{usuarioEmEdicao ? "Salvar Alterações" : "Criar Usuário"}</Button>
+        </SheetContent>
+      </Sheet>
 
-        <FadeIn>
-          <Tabs defaultValue="geral" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="geral">Geral</TabsTrigger>
-              <TabsTrigger value="loja">Loja</TabsTrigger>
-              <TabsTrigger value="fiscal">Fiscal</TabsTrigger>
-              <TabsTrigger value="usuarios">Usuários</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="geral" className="space-y-4">
-              {/* Mantendo o conteúdo original da aba Geral */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Configurações Gerais</CardTitle>
-                  <CardDescription>
-                    Configure as opções básicas do sistema
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="nome-empresa">Nome da Empresa</Label>
-                      <Input id="nome-empresa" defaultValue="Loja de Bebidas" />
+      {/* Perfil Sheet */}
+      <Sheet open={showPerfilForm} onOpenChange={setShowPerfilForm}>
+        <SheetTrigger asChild>
+          <Button>Open Sheet</Button>
+        </SheetTrigger>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>{perfilEmEdicao ? "Editar Perfil" : "Adicionar Perfil"}</SheetTitle>
+            <SheetDescription>
+              Preencha os campos abaixo para {perfilEmEdicao ? "editar" : "criar"} um perfil.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="nome">Nome</Label>
+              <Input id="nome" value={nomePerfil} onChange={(e) => setNomePerfil(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="descricao">Descrição</Label>
+              <Textarea id="descricao" value={descricaoPerfil} onChange={(e) => setDescricaoPerfil(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Permissões</Label>
+              <ScrollArea className="h-[200px] w-full rounded-md border">
+                <div className="p-4">
+                  {permissoes.map((permissao) => (
+                    <div key={permissao.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={permissao.id}
+                        checked={permissoesSelecionadas.includes(permissao.id)}
+                        onCheckedChange={() => togglePermissao(permissao.id)}
+                      />
+                      <Label htmlFor={permissao.id}>{permissao.nome}</Label>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="telefone">Telefone</Label>
-                      <Input id="telefone" defaultValue="(11) 98765-4321" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">E-mail</Label>
-                      <Input id="email" type="email" defaultValue="contato@bebidas.com" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="website">Website</Label>
-                      <Input id="website" defaultValue="www.bebidas.com" />
-                    </div>
-                  </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+          <Button onClick={handleSavePerfil}>{perfilEmEdicao ? "Salvar Alterações" : "Criar Perfil"}</Button>
+        </SheetContent>
+      </Sheet>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="endereco">Endereço</Label>
-                    <Input id="endereco" defaultValue="Rua das Bebidas, 123 - Centro" />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="notificacoes">Notificações por e-mail</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Receba alertas e relatórios por e-mail
-                      </p>
-                    </div>
-                    <Switch id="notificacoes" defaultChecked />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="autosave">Salvamento automático</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Salvar alterações automaticamente
-                      </p>
-                    </div>
-                    <Switch id="autosave" defaultChecked />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="flex justify-end">
-                <Button>
-                  Salvar Alterações
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="loja" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Configurações da Loja</CardTitle>
-                  <CardDescription>
-                    Configure os parâmetros da sua loja física e online
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    Configurações de loja serão implementadas em breve.
-                  </p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="fiscal" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Configurações Fiscais</CardTitle>
-                  <CardDescription>
-                    Configure os parâmetros fiscais e tributários
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    Configurações fiscais serão implementadas em breve.
-                  </p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="usuarios" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Gerenciar Usuários</CardTitle>
-                  <CardDescription>
-                    Configure usuários, perfis e permissões do sistema
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <Tabs value={activeUserTab} onValueChange={setActiveUserTab} className="w-full">
-                    <TabsList className="mb-4 grid grid-cols-3 w-full">
-                      <TabsTrigger value="usuarios" className="flex items-center gap-2">
-                        <UserCog className="h-4 w-4" />
-                        Usuários
-                      </TabsTrigger>
-                      <TabsTrigger value="perfis" className="flex items-center gap-2">
-                        <UserPlus className="h-4 w-4" />
-                        Perfis
-                      </TabsTrigger>
-                      <TabsTrigger value="permissoes" className="flex items-center gap-2">
-                        <Shield className="h-4 w-4" />
-                        Permissões
-                      </TabsTrigger>
-                    </TabsList>
-
-                    {/* Conteúdo da aba Usuários */}
-                    <TabsContent value="usuarios" className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-medium">Lista de Usuários</h3>
-                        <Button 
-                          onClick={() => {
-                            setEditingUsuario(null);
-                            usuarioForm.reset({
-                              nome: "",
-                              email: "",
-                              cpf: "",
-                              senha: "",
-                              perfilId: ""
-                            });
-                            setShowUsuarioForm(true);
-                          }}
-                          className="flex items-center gap-2"
-                        >
-                          <UserPlus className="h-4 w-4" />
-                          Novo Usuário
-                        </Button>
-                      </div>
-
-                      <Collapsible 
-                        open={showUsuarioForm} 
-                        onOpenChange={setShowUsuarioForm}
-                        className="mb-6"
-                      >
-                        <CollapsibleContent className="p-4 border rounded-md bg-muted/20 space-y-4">
-                          <div className="flex justify-between items-center">
-                            <h3 className="text-lg font-medium">
-                              {editingUsuario ? "Editar Usuário" : "Novo Usuário"}
-                            </h3>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => setShowUsuarioForm(false)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-
-                          <Form {...usuarioForm}>
-                            <form onSubmit={usuarioForm.handleSubmit(handleUsuarioSubmit)} className="space-y-4">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField
-                                  control={usuarioForm.control}
-                                  name="nome"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Nome</FormLabel>
-                                      <FormControl>
-                                        <Input placeholder="Nome completo" {...field} />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                
-                                <FormField
-                                  control={usuarioForm.control}
-                                  name="email"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Email</FormLabel>
-                                      <FormControl>
-                                        <Input type="email" placeholder="usuario@exemplo.com" {...field} />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-
-                                <FormField
-                                  control={usuarioForm.control}
-                                  name="cpf"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>CPF</FormLabel>
-                                      <FormControl>
-                                        <Input placeholder="123.456.789-00" {...field} />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-
-                                <FormField
-                                  control={usuarioForm.control}
-                                  name="senha"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>{editingUsuario ? "Nova Senha (deixe em branco para manter)" : "Senha"}</FormLabel>
-                                      <FormControl>
-                                        <Input type="password" placeholder="******" {...field} />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                              </div>
-
-                              <FormField
-                                control={usuarioForm.control}
-                                name="perfilId"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Perfil</FormLabel>
-                                    <Select 
-                                      onValueChange={field.onChange} 
-                                      defaultValue={field.value}
-                                    >
-                                      <FormControl>
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Selecione um perfil" />
-                                        </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        {perfis.map((perfil) => (
-                                          <SelectItem key={perfil.id} value={perfil.id}>
-                                            {perfil.nome}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-
-                              <div className="flex justify-end space-x-2">
-                                <Button 
-                                  type="button" 
-                                  variant="outline" 
-                                  onClick={() => setShowUsuarioForm(false)}
-                                >
-                                  Cancelar
-                                </Button>
-                                <Button type="submit">
-                                  {editingUsuario ? "Atualizar" : "Criar"} Usuário
-                                </Button>
-                              </div>
-                            </form>
-                          </Form>
-                        </CollapsibleContent>
-                      </Collapsible>
-
-                      {usuarios.length > 0 ? (
-                        <div className="border rounded-md">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Nome</TableHead>
-                                <TableHead>Email</TableHead>
-                                <TableHead>CPF</TableHead>
-                                <TableHead>Perfil</TableHead>
-                                <TableHead className="text-right">Ações</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {usuarios.map((usuario) => {
-                                const perfil = perfis.find(p => p.id === usuario.perfilId);
-                                
-                                return (
-                                  <TableRow key={usuario.id}>
-                                    <TableCell className="font-medium">{usuario.nome}</TableCell>
-                                    <TableCell>{usuario.email}</TableCell>
-                                    <TableCell>{usuario.cpf}</TableCell>
-                                    <TableCell>{perfil?.nome || "Sem perfil"}</TableCell>
-                                    <TableCell className="text-right">
-                                      <div className="flex justify-end gap-2">
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon"
-                                          onClick={() => handleEditUsuario(usuario)}
-                                        >
-                                          <Edit className="h-4 w-4" />
-                                        </Button>
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon"
-                                          onClick={() => handleDeleteUsuario(usuario.id)}
-                                        >
-                                          <Trash2 className="h-4 w-4 text-destructive" />
-                                        </Button>
-                                      </div>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 border rounded-md">
-                          <UserPlus className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                          <p className="text-muted-foreground">Nenhum usuário cadastrado</p>
-                          <Button 
-                            variant="outline" 
-                            onClick={() => setShowUsuarioForm(true)}
-                            className="mt-2"
-                          >
-                            Adicionar Usuário
-                          </Button>
-                        </div>
-                      )}
-                    </TabsContent>
-
-                    {/* Conteúdo da aba Perfis */}
-                    <TabsContent value="perfis" className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-medium">Perfis de Acesso</h3>
-                        <Button 
-                          onClick={() => {
-                            setEditingPerfil(null);
-                            perfilForm.reset({
-                              nome: "",
-                              descricao: ""
-                            });
-                            setShowPerfilForm(true);
-                          }}
-                          className="flex items-center gap-2"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Novo Perfil
-                        </Button>
-                      </div>
-
-                      <Collapsible 
-                        open={showPerfilForm} 
-                        onOpenChange={setShowPerfilForm}
-                        className="mb-6"
-                      >
-                        <CollapsibleContent className="p-4 border rounded-md bg-muted/20 space-y-4">
-                          <div className="flex justify-between items-center">
-                            <h3 className="text-lg font-medium">
-                              {editingPerfil ? "Editar Perfil" : "Novo Perfil"}
-                            </h3>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => setShowPerfilForm(false)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-
-                          <Form {...perfilForm}>
-                            <form onSubmit={perfilForm.handleSubmit(handlePerfilSubmit)} className="space-y-4">
-                              <FormField
-                                control={perfilForm.control}
-                                name="nome"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Nome do Perfil</FormLabel>
-                                    <FormControl>
-                                      <Input placeholder="Ex: Gerente, Caixa, etc." {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              
-                              <FormField
-                                control={perfilForm.control}
-                                name="descricao"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Descrição</FormLabel>
-                                    <FormControl>
-                                      <Textarea 
-                                        placeholder="Descreva as funções deste perfil" 
-                                        className="resize-none" 
-                                        {...field} 
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-
-                              <div className="flex justify-end space-x-2">
-                                <Button 
-                                  type="button" 
-                                  variant="outline" 
-                                  onClick={() => setShowPerfilForm(false)}
-                                >
-                                  Cancelar
-                                </Button>
-                                <Button type="submit">
-                                  {editingPerfil ? "Atualizar" : "Criar"} Perfil
-                                </Button>
-                              </div>
-                            </form>
-                          </Form>
-                        </CollapsibleContent>
-                      </Collapsible>
-
-                      {perfis.length > 0 ? (
-                        <div className="border rounded-md">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Nome</TableHead>
-                                <TableHead>Descrição</TableHead>
-                                <TableHead className="text-right">Ações</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {perfis.map((perfil) => (
-                                <TableRow key={perfil.id}>
-                                  <TableCell className="font-medium">{perfil.nome}</TableCell>
-                                  <TableCell>{perfil.descricao}</TableCell>
-                                  <TableCell className="text-right">
-                                    <div className="flex justify-end gap-2">
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon"
-                                        onClick={() => handleEditPerfil(perfil)}
-                                      >
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon"
-                                        onClick={() => handleDeletePerfil(perfil.id)}
-                                      >
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 border rounded-md">
-                          <UserCog className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                          <p className="text-muted-foreground">Nenhum perfil cadastrado</p>
-                          <Button 
-                            variant="outline" 
-                            onClick={() => setShowPerfilForm(true)}
-                            className="mt-2"
-                          >
-                            Adicionar Perfil
-                          </Button>
-                        </div>
-                      )}
-                    </TabsContent>
-
-                    {/* Conteúdo da aba Permissões */}
-                    <TabsContent value="permissoes" className="space-y-4">
-                      <div>
-                        <h3 className="text-lg font-medium mb-4">Configurar Permissões por Perfil</h3>
-                        
-                        {perfis.length > 0 ? (
-                          <div className="space-y-6">
-                            {perfis.map((perfil) => (
-                              <Card key={perfil.id} className="overflow-hidden">
-                                <CardHeader className="bg-muted/30 py-4">
-                                  <CardTitle className="text-lg">{perfil.nome}</CardTitle>
-                                  <CardDescription>{perfil.descricao}</CardDescription>
-                                </CardHeader>
-                                <CardContent className="p-6">
-                                  <div className="space-y-4">
-                                    <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                                      Acesso a Funcionalidades:
-                                    </h4>
-                                    
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                      {permissoes.map((permissao) => {
-                                        const isChecked = (perfilPermissoes[perfil.id] || []).includes(permissao.id);
-                                        
-                                        return (
-                                          <div key={permissao.id} className="flex items-start space-x-2">
-                                            <Checkbox 
-                                              id={`${perfil.id}-${permissao.id}`}
-                                              checked={isChecked}
-                                              onCheckedChange={() => togglePermissao(perfil.id, permissao.id)}
-                                            />
-                                            <div className="grid gap-1.5 leading-none">
-                                              <label
-                                                htmlFor={`${perfil.id}-${permissao.id}`}
-                                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                              >
-                                                {permissao.descricao}
-                                              </label>
-                                              <p className="text-xs text-muted-foreground">
-                                                Tela: {permissao.nome}
-                                              </p>
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-8 border rounded-md">
-                            <Shield className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                            <p className="text-muted-foreground">Nenhum perfil cadastrado para configurar permissões</p>
-                            <Button 
-                              variant="outline" 
-                              onClick={() => {
-                                setActiveUserTab("perfis");
-                                setShowPerfilForm(true);
-                              }}
-                              className="mt-2"
-                            >
-                              Adicionar Perfil
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </FadeIn>
-      </div>
-    </Layout>
+      {/* Permissão Sheet */}
+      <Sheet open={showPermissaoForm} onOpenChange={setShowPermissaoForm}>
+        <SheetTrigger asChild>
+          <Button>Open Sheet</Button>
+        </SheetTrigger>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>{permissaoEmEdicao ? "Editar Permissão" : "Adicionar Permissão"}</SheetTitle>
+            <SheetDescription>
+              Preencha os campos abaixo para {permissaoEmEdicao ? "editar" : "criar"} uma permissão.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="nome">Nome</Label>
+              <Input id="nome" value={nomePermissao} onChange={(e) => setNomePermissao(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="descricao">Descrição</Label>
+              <Textarea id="descricao" value={descricaoPermissao} onChange={(e) => setDescricaoPermissao(e.target.value)} />
+            </div>
+          </div>
+          <Button onClick={handleSavePermissao}>{permissaoEmEdicao ? "Salvar Alterações" : "Criar Permissão"}</Button>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 };
 

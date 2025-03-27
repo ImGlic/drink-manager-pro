@@ -2,18 +2,35 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Wine, ShoppingCart, BarChart3, Settings, Menu, X } from "lucide-react";
+import { Wine, ShoppingCart, BarChart3, Settings, Menu, X, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/context/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface NavLinkProps {
   to: string;
   icon: React.ReactNode;
   label: string;
   isActive: boolean;
+  permission?: string;
 }
 
-const NavLink: React.FC<NavLinkProps> = ({ to, icon, label, isActive }) => {
+const NavLink: React.FC<NavLinkProps> = ({ to, icon, label, isActive, permission }) => {
+  const { hasPermission } = useAuth();
+  
+  // Don't render if user doesn't have permission
+  if (permission && !hasPermission(permission)) {
+    return null;
+  }
+  
   return (
     <Link
       to={to}
@@ -39,6 +56,7 @@ const Navbar: React.FC = () => {
   const isMobile = useIsMobile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const { currentUser, logout } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -67,21 +85,25 @@ const Navbar: React.FC = () => {
       to: "/",
       icon: <BarChart3 className="h-5 w-5" />,
       label: "Dashboard",
+      permission: "dashboard"
     },
     {
       to: "/estoque",
       icon: <Wine className="h-5 w-5" />,
       label: "Estoque",
+      permission: "estoque"
     },
     {
       to: "/vendas",
       icon: <ShoppingCart className="h-5 w-5" />,
       label: "Vendas",
+      permission: "vendas"
     },
     {
       to: "/configuracoes",
       icon: <Settings className="h-5 w-5" />,
       label: "Configurações",
+      permission: "configuracoes"
     },
   ];
 
@@ -103,30 +125,82 @@ const Navbar: React.FC = () => {
         </div>
 
         {isMobile ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
-          >
-            {mobileMenuOpen ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <Menu className="h-5 w-5" />
+          <div className="flex items-center gap-2">
+            {currentUser && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full">
+                    <User className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col">
+                      <span>{currentUser.nome}</span>
+                      <span className="text-xs text-muted-foreground">{currentUser.perfil.nome}</span>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={logout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sair</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-          </Button>
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+            >
+              {mobileMenuOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
+            </Button>
+          </div>
         ) : (
-          <nav className="flex items-center space-x-1">
-            {links.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                icon={link.icon}
-                label={link.label}
-                isActive={location.pathname === link.to}
-              />
-            ))}
-          </nav>
+          <div className="flex items-center">
+            <nav className="flex items-center space-x-1 mr-4">
+              {links.map((link) => (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  icon={link.icon}
+                  label={link.label}
+                  isActive={location.pathname === link.to}
+                  permission={link.permission}
+                />
+              ))}
+            </nav>
+            
+            {currentUser && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <User className="h-4 w-4" />
+                    <span>{currentUser.nome}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col">
+                      <span>{currentUser.nome}</span>
+                      <span className="text-xs text-muted-foreground">{currentUser.perfil.nome}</span>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={logout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sair</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         )}
       </div>
 
@@ -146,6 +220,7 @@ const Navbar: React.FC = () => {
                 icon={link.icon}
                 label={link.label}
                 isActive={location.pathname === link.to}
+                permission={link.permission}
               />
             ))}
           </div>
