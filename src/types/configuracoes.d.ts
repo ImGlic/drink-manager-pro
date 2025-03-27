@@ -1,4 +1,3 @@
-
 // Define the types for the configuracoes module
 export interface Perfil {
   id: string;
@@ -20,4 +19,15 @@ export interface Permissao {
   id: string;
   nome: string;
   descricao: string;
+}
+
+export interface LojaConfig {
+  nome: string;
+  cnpj: string;
+  endereco: string;
+  telefone: string;
+  email: string;
+  corPrimaria: string;
+  corSecundaria: string;
+  logo?: string;
 }

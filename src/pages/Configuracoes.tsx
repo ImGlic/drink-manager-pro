@@ -66,6 +66,9 @@ const Configuracoes: React.FC = () => {
   const [enderecoLoja, setEnderecoLoja] = useState("");
   const [telefoneLoja, setTelefoneLoja] = useState("");
   const [emailLoja, setEmailLoja] = useState("");
+  const [corPrimaria, setCorPrimaria] = useState("#000000");
+  const [corSecundaria, setCorSecundaria] = useState("#ffffff");
+  const [logo, setLogo] = useState<string>("");
 
   useEffect(() => {
     const storedUsuarios = localStorage.getItem("usuarios");
@@ -91,6 +94,9 @@ const Configuracoes: React.FC = () => {
       setEnderecoLoja(lojaData.endereco || "");
       setTelefoneLoja(lojaData.telefone || "");
       setEmailLoja(lojaData.email || "");
+      setCorPrimaria(lojaData.corPrimaria || "#000000");
+      setCorSecundaria(lojaData.corSecundaria || "#ffffff");
+      setLogo(lojaData.logo || "");
     }
   }, []);
 
@@ -207,7 +213,10 @@ const Configuracoes: React.FC = () => {
       cnpj: cnpjLoja,
       endereco: enderecoLoja,
       telefone: telefoneLoja,
-      email: emailLoja
+      email: emailLoja,
+      corPrimaria,
+      corSecundaria,
+      logo
     };
 
     localStorage.setItem("loja", JSON.stringify(lojaData));
@@ -273,6 +282,17 @@ const Configuracoes: React.FC = () => {
         return [...prev, permissaoId];
       }
     });
+  }
+
+  function handleLogoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setLogo(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   }
 
   return (
@@ -456,7 +476,7 @@ const Configuracoes: React.FC = () => {
                     id="nome-loja" 
                     value={nomeLoja} 
                     onChange={(e) => setNomeLoja(e.target.value)}
-                    placeholder="Robinho Whiskeria" 
+                    placeholder="Nome da sua loja" 
                   />
                 </div>
                 
@@ -497,8 +517,57 @@ const Configuracoes: React.FC = () => {
                     type="email"
                     value={emailLoja} 
                     onChange={(e) => setEmailLoja(e.target.value)}
-                    placeholder="contato@robinhowhiskeria.com.br" 
+                    placeholder="contato@sualoja.com.br" 
                   />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="cor-primaria">Cor Primária</Label>
+                  <div className="flex gap-2 items-center">
+                    <Input 
+                      id="cor-primaria" 
+                      type="color"
+                      value={corPrimaria} 
+                      onChange={(e) => setCorPrimaria(e.target.value)}
+                      className="w-24 h-10 p-1"
+                    />
+                    <span className="text-sm text-gray-500">{corPrimaria}</span>
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="cor-secundaria">Cor Secundária</Label>
+                  <div className="flex gap-2 items-center">
+                    <Input 
+                      id="cor-secundaria" 
+                      type="color"
+                      value={corSecundaria} 
+                      onChange={(e) => setCorSecundaria(e.target.value)}
+                      className="w-24 h-10 p-1"
+                    />
+                    <span className="text-sm text-gray-500">{corSecundaria}</span>
+                  </div>
+                </div>
+
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor="logo">Logo da Loja</Label>
+                  <Input 
+                    id="logo" 
+                    type="file"
+                    onChange={handleLogoUpload}
+                    accept="image/*"
+                    className="cursor-pointer"
+                  />
+                  {logo && (
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500 mb-2">Preview:</p>
+                      <img 
+                        src={logo} 
+                        alt="Logo preview" 
+                        className="max-w-xs h-auto rounded border"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -509,7 +578,20 @@ const Configuracoes: React.FC = () => {
           </TabsContent>
         </Tabs>
 
-        <Sheet open={showUsuarioForm} onOpenChange={setShowUsuarioForm}>
+        <Sheet 
+          open={showUsuarioForm} 
+          onOpenChange={(open) => {
+            setShowUsuarioForm(open);
+            if (!open) {
+              setUsuarioEmEdicao(null);
+              setNomeUsuario("");
+              setEmailUsuario("");
+              setSenhaUsuario("");
+              setCpfUsuario("");
+              setPerfilUsuario(undefined);
+            }
+          }}
+        >
           <SheetContent>
             <SheetHeader>
               <SheetTitle>{usuarioEmEdicao ? "Editar Usuário" : "Adicionar Usuário"}</SheetTitle>
@@ -555,7 +637,18 @@ const Configuracoes: React.FC = () => {
           </SheetContent>
         </Sheet>
 
-        <Sheet open={showPerfilForm} onOpenChange={setShowPerfilForm}>
+        <Sheet 
+          open={showPerfilForm} 
+          onOpenChange={(open) => {
+            setShowPerfilForm(open);
+            if (!open) {
+              setPerfilEmEdicao(null);
+              setNomePerfil("");
+              setDescricaoPerfil("");
+              setPermissoesSelecionadas([]);
+            }
+          }}
+        >
           <SheetContent>
             <SheetHeader>
               <SheetTitle>{perfilEmEdicao ? "Editar Perfil" : "Adicionar Perfil"}</SheetTitle>
@@ -594,7 +687,17 @@ const Configuracoes: React.FC = () => {
           </SheetContent>
         </Sheet>
 
-        <Sheet open={showPermissaoForm} onOpenChange={setShowPermissaoForm}>
+        <Sheet 
+          open={showPermissaoForm} 
+          onOpenChange={(open) => {
+            setShowPermissaoForm(open);
+            if (!open) {
+              setPermissaoEmEdicao(null);
+              setNomePermissao("");
+              setDescricaoPermissao("");
+            }
+          }}
+        >
           <SheetContent>
             <SheetHeader>
               <SheetTitle>{permissaoEmEdicao ? "Editar Permissão" : "Adicionar Permissão"}</SheetTitle>
