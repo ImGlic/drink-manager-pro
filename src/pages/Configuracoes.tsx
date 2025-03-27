@@ -8,14 +8,12 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
 import {
   Table,
   TableBody,
@@ -35,7 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Form } from "@/components/ui/form"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Layout from "@/components/Layout";
 
 const Configuracoes: React.FC = () => {
@@ -63,8 +61,13 @@ const Configuracoes: React.FC = () => {
   const [descricaoPermissao, setDescricaoPermissao] = useState("");
   const [permissaoEmEdicao, setPermissaoEmEdicao] = useState<Permissao | null>(null);
 
+  const [nomeLoja, setNomeLoja] = useState("");
+  const [cnpjLoja, setCnpjLoja] = useState("");
+  const [enderecoLoja, setEnderecoLoja] = useState("");
+  const [telefoneLoja, setTelefoneLoja] = useState("");
+  const [emailLoja, setEmailLoja] = useState("");
+
   useEffect(() => {
-    // Load data from localStorage
     const storedUsuarios = localStorage.getItem("usuarios");
     if (storedUsuarios) {
       setUsuarios(JSON.parse(storedUsuarios));
@@ -79,10 +82,19 @@ const Configuracoes: React.FC = () => {
     if (storedPermissoes) {
       setPermissoes(JSON.parse(storedPermissoes));
     }
+
+    const storedLoja = localStorage.getItem("loja");
+    if (storedLoja) {
+      const lojaData = JSON.parse(storedLoja);
+      setNomeLoja(lojaData.nome || "");
+      setCnpjLoja(lojaData.cnpj || "");
+      setEnderecoLoja(lojaData.endereco || "");
+      setTelefoneLoja(lojaData.telefone || "");
+      setEmailLoja(lojaData.email || "");
+    }
   }, []);
 
   useEffect(() => {
-    // Save data to localStorage
     localStorage.setItem("usuarios", JSON.stringify(usuarios));
     localStorage.setItem("perfis", JSON.stringify(perfis));
     localStorage.setItem("permissoes", JSON.stringify(permissoes));
@@ -118,7 +130,6 @@ const Configuracoes: React.FC = () => {
       }
     });
 
-    // Reset the form
     setNomeUsuario("");
     setEmailUsuario("");
     setSenhaUsuario("");
@@ -142,7 +153,6 @@ const Configuracoes: React.FC = () => {
       permissoes: permissoesSelecionadas
     };
 
-    // Make sure we're explicitly setting the new Perfil type
     setPerfis((prev) => {
       if (perfilEmEdicao) {
         return prev.map((p) => (p.id === perfilEmEdicao.id ? newPerfil : p));
@@ -151,7 +161,6 @@ const Configuracoes: React.FC = () => {
       }
     });
 
-    // Reset the form
     setNomePerfil("");
     setDescricaoPerfil("");
     setPermissoesSelecionadas([]);
@@ -180,12 +189,29 @@ const Configuracoes: React.FC = () => {
       }
     });
 
-    // Reset the form
     setNomePermissao("");
     setDescricaoPermissao("");
     setPermissaoEmEdicao(null);
     setShowPermissaoForm(false);
     toast.success(`Permissão ${permissaoEmEdicao ? "atualizada" : "criada"} com sucesso!`);
+  }
+
+  function handleSaveLoja() {
+    if (!nomeLoja || !cnpjLoja) {
+      toast.error("Nome e CNPJ são obrigatórios!");
+      return;
+    }
+
+    const lojaData = {
+      nome: nomeLoja,
+      cnpj: cnpjLoja,
+      endereco: enderecoLoja,
+      telefone: telefoneLoja,
+      email: emailLoja
+    };
+
+    localStorage.setItem("loja", JSON.stringify(lojaData));
+    toast.success("Dados da loja salvos com sucesso!");
   }
 
   function handleEditUsuario(usuario: Usuario) {
@@ -220,7 +246,6 @@ const Configuracoes: React.FC = () => {
 
   function handleDeletePerfil(id: string) {
     setPerfis((prev) => prev.filter((p) => p.id !== id));
-    // Also update usuarios to remove the perfil
     setUsuarios((prev) =>
       prev.map((usuario) =>
         usuario.perfil.id === id ? { ...usuario, perfil: { ...usuario.perfil, id: "", nome: "Sem perfil", descricao: "", permissoes: [] } } : usuario
@@ -231,7 +256,6 @@ const Configuracoes: React.FC = () => {
 
   function handleDeletePermissao(id: string) {
     setPermissoes((prev) => prev.filter((p) => p.id !== id));
-    // Also update perfis to remove the permissao
     setPerfis((prev) =>
       prev.map((perfil) => ({
         ...perfil,
@@ -256,167 +280,235 @@ const Configuracoes: React.FC = () => {
       <div className="container max-w-7xl mx-auto p-4">
         <h1 className="text-2xl font-semibold mb-4">Configurações</h1>
 
-        {/* Usuários */}
-        <section className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-xl font-semibold">Usuários</h2>
-            <Button size="sm" onClick={() => setShowUsuarioForm(true)}>
-              Adicionar Usuário
-            </Button>
-          </div>
+        <Tabs defaultValue="usuarios" className="w-full">
+          <TabsList className="mb-4 w-full">
+            <TabsTrigger value="usuarios">Usuários</TabsTrigger>
+            <TabsTrigger value="perfis">Perfis</TabsTrigger>
+            <TabsTrigger value="permissoes">Permissões</TabsTrigger>
+            <TabsTrigger value="loja">Loja</TabsTrigger>
+          </TabsList>
 
-          <Table>
-            <TableCaption>Lista de usuários cadastrados no sistema.</TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[100px]">ID</TableHead>
-                <TableHead>Nome</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>CPF</TableHead>
-                <TableHead>Perfil</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {usuarios.map((usuario) => (
-                <TableRow key={usuario.id}>
-                  <TableCell className="font-medium">{usuario.id}</TableCell>
-                  <TableCell>{usuario.nome}</TableCell>
-                  <TableCell>{usuario.email}</TableCell>
-                  <TableCell>{usuario.cpf}</TableCell>
-                  <TableCell>{usuario.perfil.nome}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Abrir menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleEditUsuario(usuario)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          <span>Editar</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteUsuario(usuario.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          <span>Excluir</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+          <TabsContent value="usuarios">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xl font-semibold">Usuários</h2>
+              <Button size="sm" onClick={() => setShowUsuarioForm(true)}>
+                Adicionar Usuário
+              </Button>
+            </div>
+
+            <Table>
+              <TableCaption>Lista de usuários cadastrados no sistema.</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px]">ID</TableHead>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>CPF</TableHead>
+                  <TableHead>Perfil</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </section>
+              </TableHeader>
+              <TableBody>
+                {usuarios.map((usuario) => (
+                  <TableRow key={usuario.id}>
+                    <TableCell className="font-medium">{usuario.id}</TableCell>
+                    <TableCell>{usuario.nome}</TableCell>
+                    <TableCell>{usuario.email}</TableCell>
+                    <TableCell>{usuario.cpf}</TableCell>
+                    <TableCell>{usuario.perfil.nome}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Abrir menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => handleEditUsuario(usuario)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            <span>Editar</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteUsuario(usuario.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>Excluir</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TabsContent>
 
-        {/* Perfis */}
-        <section className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-xl font-semibold">Perfis</h2>
-            <Button size="sm" onClick={() => setShowPerfilForm(true)}>
-              Adicionar Perfil
-            </Button>
-          </div>
+          <TabsContent value="perfis">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xl font-semibold">Perfis</h2>
+              <Button size="sm" onClick={() => setShowPerfilForm(true)}>
+                Adicionar Perfil
+              </Button>
+            </div>
 
-          <Table>
-            <TableCaption>Lista de perfis cadastrados no sistema.</TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[100px]">ID</TableHead>
-                <TableHead>Nome</TableHead>
-                <TableHead>Descrição</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {perfis.map((perfil) => (
-                <TableRow key={perfil.id}>
-                  <TableCell className="font-medium">{perfil.id}</TableCell>
-                  <TableCell>{perfil.nome}</TableCell>
-                  <TableCell>{perfil.descricao}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Abrir menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleEditPerfil(perfil)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          <span>Editar</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeletePerfil(perfil.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          <span>Excluir</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+            <Table>
+              <TableCaption>Lista de perfis cadastrados no sistema.</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px]">ID</TableHead>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </section>
+              </TableHeader>
+              <TableBody>
+                {perfis.map((perfil) => (
+                  <TableRow key={perfil.id}>
+                    <TableCell className="font-medium">{perfil.id}</TableCell>
+                    <TableCell>{perfil.nome}</TableCell>
+                    <TableCell>{perfil.descricao}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Abrir menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => handleEditPerfil(perfil)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            <span>Editar</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeletePerfil(perfil.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>Excluir</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TabsContent>
 
-        {/* Permissões */}
-        <section className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-xl font-semibold">Permissões</h2>
-            <Button size="sm" onClick={() => setShowPermissaoForm(true)}>
-              Adicionar Permissão
-            </Button>
-          </div>
+          <TabsContent value="permissoes">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xl font-semibold">Permissões</h2>
+              <Button size="sm" onClick={() => setShowPermissaoForm(true)}>
+                Adicionar Permissão
+              </Button>
+            </div>
 
-          <Table>
-            <TableCaption>Lista de permissões cadastradas no sistema.</TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[100px]">ID</TableHead>
-                <TableHead>Nome</TableHead>
-                <TableHead>Descrição</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {permissoes.map((permissao) => (
-                <TableRow key={permissao.id}>
-                  <TableCell className="font-medium">{permissao.id}</TableCell>
-                  <TableCell>{permissao.nome}</TableCell>
-                  <TableCell>{permissao.descricao}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Abrir menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleEditPermissao(permissao)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          <span>Editar</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeletePermissao(permissao.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          <span>Excluir</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+            <Table>
+              <TableCaption>Lista de permissões cadastradas no sistema.</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px]">ID</TableHead>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </section>
+              </TableHeader>
+              <TableBody>
+                {permissoes.map((permissao) => (
+                  <TableRow key={permissao.id}>
+                    <TableCell className="font-medium">{permissao.id}</TableCell>
+                    <TableCell>{permissao.nome}</TableCell>
+                    <TableCell>{permissao.descricao}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Abrir menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => handleEditPermissao(permissao)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            <span>Editar</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeletePermissao(permissao.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>Excluir</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TabsContent>
 
-        {/* Usuário Sheet */}
+          <TabsContent value="loja">
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <h2 className="text-xl font-semibold mb-4">Dados da Loja</h2>
+              
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="nome-loja">Nome da Loja</Label>
+                  <Input 
+                    id="nome-loja" 
+                    value={nomeLoja} 
+                    onChange={(e) => setNomeLoja(e.target.value)}
+                    placeholder="Robinho Whiskeria" 
+                  />
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="cnpj-loja">CNPJ</Label>
+                  <Input 
+                    id="cnpj-loja" 
+                    value={cnpjLoja} 
+                    onChange={(e) => setCnpjLoja(e.target.value)}
+                    placeholder="XX.XXX.XXX/0001-XX" 
+                  />
+                </div>
+                
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor="endereco-loja">Endereço</Label>
+                  <Input 
+                    id="endereco-loja" 
+                    value={enderecoLoja} 
+                    onChange={(e) => setEnderecoLoja(e.target.value)}
+                    placeholder="Rua, número, bairro, cidade, estado, CEP" 
+                  />
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="telefone-loja">Telefone</Label>
+                  <Input 
+                    id="telefone-loja" 
+                    value={telefoneLoja} 
+                    onChange={(e) => setTelefoneLoja(e.target.value)}
+                    placeholder="(XX) XXXXX-XXXX" 
+                  />
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="email-loja">Email</Label>
+                  <Input 
+                    id="email-loja" 
+                    type="email"
+                    value={emailLoja} 
+                    onChange={(e) => setEmailLoja(e.target.value)}
+                    placeholder="contato@robinhowhiskeria.com.br" 
+                  />
+                </div>
+              </div>
+              
+              <Button onClick={handleSaveLoja} className="mt-6">
+                Salvar Configurações da Loja
+              </Button>
+            </div>
+          </TabsContent>
+        </Tabs>
+
         <Sheet open={showUsuarioForm} onOpenChange={setShowUsuarioForm}>
           <SheetContent>
             <SheetHeader>
@@ -463,7 +555,6 @@ const Configuracoes: React.FC = () => {
           </SheetContent>
         </Sheet>
 
-        {/* Perfil Sheet */}
         <Sheet open={showPerfilForm} onOpenChange={setShowPerfilForm}>
           <SheetContent>
             <SheetHeader>
@@ -503,7 +594,6 @@ const Configuracoes: React.FC = () => {
           </SheetContent>
         </Sheet>
 
-        {/* Permissão Sheet */}
         <Sheet open={showPermissaoForm} onOpenChange={setShowPermissaoForm}>
           <SheetContent>
             <SheetHeader>
