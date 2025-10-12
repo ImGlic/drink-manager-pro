@@ -14,16 +14,166 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      loja_config: {
+        Row: {
+          cnpj: string | null
+          cor_primaria: string | null
+          cor_secundaria: string | null
+          created_at: string | null
+          email: string | null
+          endereco: string | null
+          id: string
+          logo_url: string | null
+          nome: string
+          telefone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cnpj?: string | null
+          cor_primaria?: string | null
+          cor_secundaria?: string | null
+          created_at?: string | null
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          logo_url?: string | null
+          nome: string
+          telefone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cnpj?: string | null
+          cor_primaria?: string | null
+          cor_secundaria?: string | null
+          created_at?: string | null
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          logo_url?: string | null
+          nome?: string
+          telefone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      permissoes: {
+        Row: {
+          created_at: string | null
+          descricao: string | null
+          id: string
+          nome: string
+        }
+        Insert: {
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          nome: string
+        }
+        Update: {
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          cpf: string | null
+          created_at: string | null
+          id: string
+          nome: string
+          updated_at: string | null
+        }
+        Insert: {
+          cpf?: string | null
+          created_at?: string | null
+          id: string
+          nome: string
+          updated_at?: string | null
+        }
+        Update: {
+          cpf?: string | null
+          created_at?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      role_permissions: {
+        Row: {
+          id: string
+          permissao_id: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          id?: string
+          permissao_id: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          id?: string
+          permissao_id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_permissao_id_fkey"
+            columns: ["permissao_id"]
+            isOneToOne: false
+            referencedRelation: "permissoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_permissions: {
+        Args: { _user_id: string }
+        Returns: {
+          permissao_nome: string
+        }[]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user" | "vendedor" | "gerente"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +300,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user", "vendedor", "gerente"],
+    },
   },
 } as const
