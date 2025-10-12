@@ -137,7 +137,7 @@ const Navbar: React.FC = () => {
                   <DropdownMenuLabel>
                     <div className="flex flex-col">
                       <span>{currentUser.nome}</span>
-                      <span className="text-xs text-muted-foreground">{currentUser.perfil.nome}</span>
+                      <span className="text-xs text-muted-foreground">{currentUser.email}</span>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
@@ -189,7 +189,7 @@ const Navbar: React.FC = () => {
                   <DropdownMenuLabel>
                     <div className="flex flex-col">
                       <span>{currentUser.nome}</span>
-                      <span className="text-xs text-muted-foreground">{currentUser.perfil.nome}</span>
+                      <span className="text-xs text-muted-foreground">{currentUser.email}</span>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />

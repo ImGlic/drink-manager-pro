@@ -2,16 +2,21 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { User } from "@supabase/supabase-js";
+import { 
+  signInUser, 
+  signOutUser, 
+  getCurrentUserProfile, 
+  getUserPermissions,
+  Profile 
+} from "@/lib/supabase-helpers";
 
 export interface Usuario {
   id: string;
   nome: string;
   email: string;
-  perfil: {
-    id: string;
-    nome: string;
-    permissoes: string[];
-  };
+  permissions: string[];
 }
 
 interface AuthContextType {
@@ -37,59 +42,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Load user from localStorage on initial load
+  // Load user from Supabase on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem("currentUser");
-    if (storedUser) {
-      try {
-        setCurrentUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error("Failed to parse stored user", error);
-        localStorage.removeItem("currentUser");
+    const loadUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        await updateCurrentUser(session.user);
       }
-    }
-    setIsLoading(false);
+      
+      setIsLoading(false);
+    };
+
+    loadUser();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          await updateCurrentUser(session.user);
+        } else {
+          setCurrentUser(null);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  const updateCurrentUser = async (user: User) => {
+    const profile = await getCurrentUserProfile();
+    const permissions = await getUserPermissions(user.id);
+
+    if (profile) {
+      setCurrentUser({
+        id: user.id,
+        nome: profile.nome,
+        email: user.email || "",
+        permissions
+      });
+    }
+  };
 
   const login = async (email: string, senha: string): Promise<boolean> => {
     setIsLoading(true);
     
     try {
-      // In a real app, this would be an API call
-      // For now, we'll use mock data from localStorage
-      const usuariosString = localStorage.getItem("usuarios");
+      const result = await signInUser(email, senha);
       
-      if (!usuariosString) {
-        toast.error("Nenhum usuário cadastrado no sistema");
+      if (result.success && result.data.user) {
+        await updateCurrentUser(result.data.user);
+        toast.success("Login realizado com sucesso!");
         setIsLoading(false);
-        return false;
+        return true;
       }
-      
-      const usuarios = JSON.parse(usuariosString);
-      const user = usuarios.find(
-        (u: any) => u.email === email && u.senha === senha
-      );
-      
-      if (!user) {
-        toast.error("Email ou senha incorretos");
-        setIsLoading(false);
-        return false;
-      }
-      
-      // Store user in state and localStorage
-      const userWithoutSenha = {
-        id: user.id,
-        nome: user.nome,
-        email: user.email,
-        perfil: user.perfil
-      };
-      
-      setCurrentUser(userWithoutSenha);
-      localStorage.setItem("currentUser", JSON.stringify(userWithoutSenha));
-      toast.success(`Bem-vindo, ${user.nome}!`);
       
       setIsLoading(false);
-      return true;
+      return false;
     } catch (error) {
       console.error("Login error:", error);
       toast.error("Erro ao fazer login");
@@ -98,16 +107,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await signOutUser();
     setCurrentUser(null);
-    localStorage.removeItem("currentUser");
-    toast.info("Sessão encerrada");
     navigate("/login");
   };
 
   const hasPermission = (permission: string): boolean => {
     if (!currentUser) return false;
-    return currentUser.perfil.permissoes.includes(permission);
+    return currentUser.permissions.includes(permission);
   };
 
   return (
