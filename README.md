@@ -1,69 +1,69 @@
-# Welcome to your Lovable project
+# Meu Bar — PDV web para bares
 
-## Project info
+Sistema 100% web (computador, tablet e celular pelo navegador), multi-bar:
+cada bar tem seus perfis, usuários, produtos, vendas e configuração fiscal isolados por RLS.
 
-**URL**: https://lovable.dev/projects/1f4a524c-515c-44dd-a566-3c60ad10acc2
-
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/1f4a524c-515c-44dd-a566-3c60ad10acc2) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Rodar localmente
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+npm install
+npm run dev          # http://localhost:8080
+npm run dev:https    # https na rede local — necessário para usar a câmera do celular
 ```
 
-**Edit a file directly in GitHub**
+## Testar com Docker
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```sh
+docker compose up -d --build     # usa VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY do .env
+```
 
-**Use GitHub Codespaces**
+- Computador: http://localhost:3080 ou https://localhost:3443
+- Celular na mesma rede: `https://<IP-do-PC>:3443` (aceite o aviso do certificado de teste).
+  Para o certificado incluir o IP: `HOST_IP=192.168.x.x docker compose up -d`
+- Portas: `HTTP_PORT` / `HTTPS_PORT`. Parar: `docker compose down`.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+A imagem é a mesma para teste e produção: URL e chave do Supabase são lidas do ambiente do
+container ao iniciar (`/config.js`), não ficam fixas no build.
 
-## What technologies are used for this project?
+## Pipeline (GitHub Actions)
 
-This project is built with .
+- **CI** (`.github/workflows/ci.yml`, em PRs e branches): lint, tipos, build, `deno check` das
+  Edge Functions, migrations aplicadas num Postgres descartável e build da imagem.
+- **Deploy** (`.github/workflows/deploy.yml`, push na `main`): CI → imagem no GHCR →
+  migrations + Edge Functions no Supabase → servidor via SSH com `docker compose`
+  (`deploy/docker-compose.prod.yml`) e Caddy com HTTPS automático.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+O servidor precisa apenas de Docker, portas 80/443 liberadas e um domínio apontando para ele.
+As variáveis e secrets necessárias estão listadas no topo do `deploy.yml`; os jobs de Supabase e
+servidor só rodam quando `DEPLOY_SUPABASE` / `DEPLOY_SERVER` = `true`.
 
-## How can I deploy this project?
+## Implantação no Supabase
 
-Simply open [Lovable](https://lovable.dev/projects/1f4a524c-515c-44dd-a566-3c60ad10acc2) and click on Share -> Publish.
+1. **Banco**: `npx supabase link --project-ref <ref>` e `npx supabase db push`
+   (ou cole as migrations de `supabase/migrations` no SQL Editor, na ordem).
+2. **Secrets das funções**:
+   ```sh
+   npx supabase secrets set CERT_ENCRYPTION_KEY="<texto aleatório com 32+ caracteres>"
+   npx supabase secrets set NUVEMFISCAL_CLIENT_ID="..." NUVEMFISCAL_CLIENT_SECRET="..."
+   # produção fiscal: NUVEMFISCAL_API_URL="https://api.nuvemfiscal.com.br" (padrão: sandbox)
+   ```
+   Guarde a `CERT_ENCRYPTION_KEY`: se ela mudar, os certificados precisam ser reenviados.
+3. **Funções**: `npx supabase functions deploy gerenciar-usuarios certificado-a1 nfce`
+4. **Frontend**: publique o `dist/` (Vercel, Netlify, Cloudflare Pages) com HTTPS — a câmera exige HTTPS.
 
-## I want to use a custom domain - is that possible?
+## Módulos
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+| Área | Onde |
+| --- | --- |
+| Bares, perfis, membros, RLS, RPCs de venda/estoque | `supabase/migrations/20261103120000_multi_bar_pdv_fiscal.sql` |
+| Usuários do bar (cria login) | `supabase/functions/gerenciar-usuarios` |
+| Certificado A1 (.pfx) cifrado | `supabase/functions/certificado-a1` |
+| NFC-e via Nuvem Fiscal | `supabase/functions/nfce` |
+| Leitor BIP / coletor (teclado) | `src/hooks/useBarcodeScanner.ts` |
+| Câmera (QR e código de barras) | `src/components/scanner/CameraScanner.tsx` |
+| Impressão térmica ESC/POS e 58/80mm | `src/lib/printing/` |
+
+## Fluxo fiscal
+
+Comece em **homologação**: cadastre CNPJ, IE, endereço com código IBGE, certificado A1 e CSC em
+Ajustes > Fiscal, clique em "Sincronizar com provedor" e emita vendas de teste. Só depois mude para produção.

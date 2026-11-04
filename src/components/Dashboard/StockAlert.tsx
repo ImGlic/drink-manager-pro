@@ -20,12 +20,12 @@ interface StockAlertProps {
 const StockAlert: React.FC<StockAlertProps> = ({ products }) => {
   // Filter products with low stock
   const lowStockProducts = products.filter(
-    (product) => product.currentStock <= product.minimumStock
+    (product) => product.currentStock <= product.minimumStock && (product.minimumStock > 0 || product.currentStock <= 0)
   );
 
   // Sort by stock level (lowest first)
   const sortedProducts = [...lowStockProducts].sort(
-    (a, b) => (a.currentStock / a.minimumStock) - (b.currentStock / b.minimumStock)
+    (a, b) => (a.currentStock - a.minimumStock) - (b.currentStock - b.minimumStock)
   );
 
   // Get only the first 5 products

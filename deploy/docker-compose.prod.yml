@@ -1,0 +1,33 @@
+# Produção: app + Caddy (HTTPS automático com Let's Encrypt).
+# A pipeline copia este arquivo para ~/meu-bar no servidor e gera o .env.
+services:
+  web:
+    image: ${IMAGE}:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
+      SITE_URL: https://${DOMAIN}
+      ENABLE_HTTPS: "false" # o TLS fica no Caddy
+    expose:
+      - "80"
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

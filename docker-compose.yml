@@ -1,0 +1,25 @@
+# Ambiente de testes local.
+#   docker compose up -d --build
+#   Computador: http://localhost:3080  (ou https://localhost:3443)
+#   Celular na mesma rede: https://<IP-do-computador>:3443  (aceite o aviso do certificado)
+#
+# As variáveis vêm do arquivo .env (as mesmas do Vite).
+services:
+  web:
+    build: .
+    image: meu-bar:local
+    container_name: meu-bar
+    restart: unless-stopped
+    environment:
+      SUPABASE_URL: ${VITE_SUPABASE_URL}
+      SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+      ENABLE_HTTPS: "true"
+      HOST_IP: ${HOST_IP:-}
+    ports:
+      - "${HTTP_PORT:-3080}:80"
+      - "${HTTPS_PORT:-3443}:443"
+    volumes:
+      - certs:/etc/nginx/certs
+
+volumes:
+  certs:

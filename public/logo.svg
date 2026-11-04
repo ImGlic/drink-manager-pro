@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Meu Bar">
+  <defs>
+    <linearGradient id="mb-fundo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#D97706"/>
+      <stop offset="1" stop-color="#7C2D12"/>
+    </linearGradient>
+    <linearGradient id="mb-liquido" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FCD34D"/>
+      <stop offset="1" stop-color="#D97706"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#mb-fundo)"/>
+  <!-- copo baixo (old fashioned) -->
+  <path d="M16 16h32l-3.4 29.6A4.5 4.5 0 0 1 40.1 49.6H23.9a4.5 4.5 0 0 1-4.5-4Z" fill="#FFF8EC"/>
+  <!-- whisky -->
+  <path d="M19.2 31h25.6l-2.1 14.1a2.4 2.4 0 0 1-2.4 2.1H23.7a2.4 2.4 0 0 1-2.4-2.1Z" fill="url(#mb-liquido)"/>
+  <!-- gelo -->
+  <rect x="23.5" y="25" width="9.5" height="9.5" rx="2.2" transform="rotate(-14 28.25 29.75)" fill="#FFFFFF" fill-opacity=".92"/>
+  <rect x="33" y="27.2" width="8.5" height="8.5" rx="2" transform="rotate(12 37.25 31.45)" fill="#FFFFFF" fill-opacity=".78"/>
+  <!-- reflexo -->
+  <path d="M20.6 20.5l2.3 21.5" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" opacity=".75"/>
+</svg>

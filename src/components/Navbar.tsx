@@ -1,11 +1,10 @@
-
-import React, { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import React from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { BarChart3, Check, ChevronsUpDown, LogOut, Plus, Settings, ShoppingCart, Store, User, Wine } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Wine, ShoppingCart, BarChart3, Settings, Menu, X, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/context/AuthContext";
+import { LogoMarca } from "@/components/Logo";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,218 +14,126 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-interface NavLinkProps {
-  to: string;
-  icon: React.ReactNode;
-  label: string;
-  isActive: boolean;
-  permission?: string;
-}
+const LINKS = [
+  { to: "/", icon: BarChart3, label: "Dashboard", permission: "dashboard" },
+  { to: "/vendas", icon: ShoppingCart, label: "Vendas", permission: "vendas" },
+  { to: "/estoque", icon: Wine, label: "Estoque", permission: "estoque" },
+  { to: "/configuracoes", icon: Settings, label: "Ajustes", permission: null },
+];
 
-const NavLink: React.FC<NavLinkProps> = ({ to, icon, label, isActive, permission }) => {
-  const { hasPermission } = useAuth();
-  
-  // Don't render if user doesn't have permission
-  if (permission && !hasPermission(permission)) {
-    return null;
-  }
-  
+const SeletorBar: React.FC = () => {
+  const { bares, barAtivo, selecionarBar } = useAuth();
+  const navigate = useNavigate();
+  if (!barAtivo) return null;
+
   return (
-    <Link
-      to={to}
-      className={cn(
-        "flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200",
-        "hover:bg-primary/10",
-        isActive 
-          ? "bg-primary/10 text-primary font-medium" 
-          : "text-foreground/80"
-      )}
-    >
-      {icon}
-      <span>{label}</span>
-      {isActive && (
-        <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
-      )}
-    </Link>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="h-auto px-2 py-1 gap-2 max-w-[60vw] sm:max-w-xs">
+          {barAtivo.bar.logo_url ? (
+            <img src={barAtivo.bar.logo_url} alt="" className="h-8 w-8 rounded-full object-cover shrink-0" />
+          ) : (
+            <LogoMarca className="h-8 w-8" />
+          )}
+          <div className="flex flex-col items-start min-w-0">
+            <span className="font-display font-medium truncate max-w-full">{barAtivo.bar.nome}</span>
+            <span className="text-xs text-muted-foreground truncate max-w-full">{barAtivo.perfil?.nome}</span>
+          </div>
+          <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64">
+        <DropdownMenuLabel>Seus bares</DropdownMenuLabel>
+        {bares.map((b) => (
+          <DropdownMenuItem key={b.bar.id} onClick={() => selecionarBar(b.bar.id)}>
+            <Store className="mr-2 h-4 w-4" />
+            <span className="flex-1 truncate">{b.bar.nome}</span>
+            {b.bar.id === barAtivo.bar.id && <Check className="h-4 w-4" />}
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate("/cadastro-bar")}>
+          <Plus className="mr-2 h-4 w-4" /> Cadastrar novo bar
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
 const Navbar: React.FC = () => {
   const location = useLocation();
-  const isMobile = useIsMobile();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const { currentUser, logout } = useAuth();
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 10);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  useEffect(() => {
-    if (mobileMenuOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "auto";
-    }
-  }, [mobileMenuOpen]);
-
-  // Close mobile menu when route changes
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [location.pathname]);
-
-  const links = [
-    {
-      to: "/",
-      icon: <BarChart3 className="h-5 w-5" />,
-      label: "Dashboard",
-      permission: "dashboard"
-    },
-    {
-      to: "/estoque",
-      icon: <Wine className="h-5 w-5" />,
-      label: "Estoque",
-      permission: "estoque"
-    },
-    {
-      to: "/vendas",
-      icon: <ShoppingCart className="h-5 w-5" />,
-      label: "Vendas",
-      permission: "vendas"
-    },
-    {
-      to: "/configuracoes",
-      icon: <Settings className="h-5 w-5" />,
-      label: "Configurações",
-      permission: "configuracoes"
-    },
-  ];
+  const { currentUser, logout, hasPermission } = useAuth();
+  const links = LINKS.filter((l) => !l.permission || hasPermission(l.permission));
 
   return (
-    <header
-      className={cn(
-        "sticky top-0 z-50 w-full transition-all duration-300",
-        scrolled
-          ? "bg-white/80 backdrop-blur-md shadow-sm border-b"
-          : "bg-transparent"
-      )}
-    >
-      <div className="container max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Wine className="h-8 w-8 text-primary" />
-          <h1 className="text-xl font-display font-medium">
-            <span className="text-primary">Robinho</span>Whiskeria
-          </h1>
-        </div>
+    <>
+      <header className="sticky top-0 z-40 w-full bg-background/90 backdrop-blur-md border-b pt-[env(safe-area-inset-top)]">
+        <div className="container max-w-7xl mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-2">
+          <SeletorBar />
 
-        {isMobile ? (
-          <div className="flex items-center gap-2">
-            {currentUser && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full">
-                    <User className="h-5 w-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col">
-                      <span>{currentUser.nome}</span>
-                      <span className="text-xs text-muted-foreground">{currentUser.email}</span>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={logout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Sair</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-            
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
-            >
-              {mobileMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center">
-            <nav className="flex items-center space-x-1 mr-4">
-              {links.map((link) => (
-                <NavLink
-                  key={link.to}
-                  to={link.to}
-                  icon={link.icon}
-                  label={link.label}
-                  isActive={location.pathname === link.to}
-                  permission={link.permission}
-                />
-              ))}
-            </nav>
-            
-            {currentUser && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2">
-                    <User className="h-4 w-4" />
+          <nav className="hidden md:flex items-center gap-1">
+            {links.map(({ to, icon: Icon, label }) => (
+              <Link
+                key={to}
+                to={to}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg transition-colors hover:bg-primary/10",
+                  location.pathname === to ? "bg-primary/10 text-primary font-medium" : "text-foreground/80"
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                <span>{label}</span>
+              </Link>
+            ))}
+          </nav>
+
+          {currentUser && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2 shrink-0">
+                  <User className="h-4 w-4" />
+                  <span className="hidden sm:inline max-w-[140px] truncate">{currentUser.nome}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col">
                     <span>{currentUser.nome}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col">
-                      <span>{currentUser.nome}</span>
-                      <span className="text-xs text-muted-foreground">{currentUser.email}</span>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={logout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Sair</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Mobile menu */}
-      {isMobile && (
-        <div
-          className={cn(
-            "fixed inset-0 bg-background/80 backdrop-blur-sm z-50 transition-all duration-300 lg:hidden",
-            mobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+                    <span className="text-xs text-muted-foreground">{currentUser.email}</span>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Sair</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
-        >
-          <div className="absolute inset-x-0 top-16 p-4 flex flex-col space-y-1 bg-white rounded-b-xl shadow-elevated border">
-            {links.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                icon={link.icon}
-                label={link.label}
-                isActive={location.pathname === link.to}
-                permission={link.permission}
-              />
+        </div>
+      </header>
+
+      {/* Navegação inferior no celular */}
+      {links.length > 1 && (
+        <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-background border-t pb-[env(safe-area-inset-bottom)]">
+          <div className="grid" style={{ gridTemplateColumns: `repeat(${links.length}, minmax(0, 1fr))` }}>
+            {links.map(({ to, icon: Icon, label }) => (
+              <Link
+                key={to}
+                to={to}
+                className={cn(
+                  "flex flex-col items-center gap-0.5 py-2 text-xs",
+                  location.pathname === to ? "text-primary font-medium" : "text-muted-foreground"
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                {label}
+              </Link>
             ))}
           </div>
-        </div>
+        </nav>
       )}
-    </header>
+    </>
   );
 };
 

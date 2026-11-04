@@ -116,11 +116,11 @@ export const StaggeredContainer = ({
     <div className={className}>
       {childrenArray.map((child, index) => {
         if (React.isValidElement(child)) {
-          return React.cloneElement(child as React.ReactElement<any>, {
+          return React.cloneElement(child as React.ReactElement<{ transition?: object }>, {
             key: index,
             transition: {
               delay: delay + index * staggerDelay,
-              ...((child as React.ReactElement<any>).props.transition || {}),
+              ...((child as React.ReactElement<{ transition?: object }>).props.transition || {}),
             },
           });
         }

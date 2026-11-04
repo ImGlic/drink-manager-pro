@@ -1,385 +1,381 @@
-
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Camera, Receipt, ScanBarcode, Search, ShoppingCart, Wine } from "lucide-react";
+import { toast } from "sonner";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { mockProducts, mockSales } from "@/data/mockData";
-import { 
-  ShoppingCart, 
-  Search, 
-  Trash2, 
-  MinusCircle, 
-  PlusCircle,
-  Receipt,
-  CheckCircle2
-} from "lucide-react";
-import { 
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "@/components/ui/table";
-import { FadeIn, SlideInFromBottom, StaggeredContainer } from "@/components/ui/motion";
-import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import CameraScanner from "@/components/scanner/CameraScanner";
+import Carrinho, { totalCarrinho } from "@/components/pdv/Carrinho";
+import CheckoutDialog, { type ResultadoCheckout } from "@/components/pdv/CheckoutDialog";
+import HistoricoVendas from "@/components/pdv/HistoricoVendas";
+import { useAuth } from "@/context/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { bip, useBarcodeScanner } from "@/hooks/useBarcodeScanner";
+import { formatBRL, mensagemErro } from "@/lib/format";
+import { imprimirCupom, lerConfigImpressora } from "@/lib/printing/impressora";
+import { buscarPorCodigo, listarProdutos, type Produto } from "@/services/produtosService";
+import { carregarConfigFiscal, emitirNfce } from "@/services/baresService";
+import { carregarVenda, finalizarVenda, vendaParaCupom, type ItemCarrinho } from "@/services/vendasService";
 
-interface CartItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-}
+const chaveCarrinho = (barId: string) => `dmp:carrinho:${barId}`;
+
+const lerCarrinho = (barId: string): ItemCarrinho[] => {
+  try {
+    return JSON.parse(localStorage.getItem(chaveCarrinho(barId)) ?? "[]");
+  } catch {
+    return [];
+  }
+};
 
 const Vendas = () => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [products, setProducts] = useState(mockProducts);
-  const [sales, setSales] = useState(mockSales);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const { barAtivo, hasPermission } = useAuth();
+  const barId = barAtivo!.bar.id;
+  const permiteNegativo = barAtivo!.bar.permitir_estoque_negativo;
+  const isMobile = useIsMobile();
+  const queryClient = useQueryClient();
 
-  // Filter products based on search
-  const filteredProducts = products.filter(product => 
-    product.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const [busca, setBusca] = useState("");
+  const [categoria, setCategoria] = useState<string | null>(null);
+  const [carrinho, setCarrinho] = useState<ItemCarrinho[]>(() => lerCarrinho(barId));
+  const [cameraAberta, setCameraAberta] = useState(false);
+  const [carrinhoAberto, setCarrinhoAberto] = useState(false);
+  const [checkoutAberto, setCheckoutAberto] = useState(false);
+  const [processando, setProcessando] = useState(false);
+  const [aba, setAba] = useState("nova");
+
+  const { data: produtos = [], isLoading } = useQuery({
+    queryKey: ["produtos", barId],
+    queryFn: () => listarProdutos(barId),
+  });
+
+  const podeEmitir = hasPermission("fiscal");
+  const { data: configFiscal } = useQuery({
+    queryKey: ["config-fiscal", barId],
+    queryFn: () => carregarConfigFiscal(barId),
+    enabled: podeEmitir,
+  });
+
+  // carrinho sobrevive a recarregar a página (útil no celular)
+  useEffect(() => setCarrinho(lerCarrinho(barId)), [barId]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(chaveCarrinho(barId), JSON.stringify(carrinho));
+    } catch {
+      /* armazenamento indisponível */
+    }
+  }, [carrinho, barId]);
+
+  const ativos = useMemo(() => produtos.filter((p) => p.ativo), [produtos]);
+  const categorias = useMemo(
+    () => Array.from(new Set(ativos.map((p) => p.categoria?.nome).filter(Boolean))) as string[],
+    [ativos]
+  );
+  const filtrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    return ativos.filter(
+      (p) =>
+        (!categoria || p.categoria?.nome === categoria) &&
+        (!termo ||
+          p.nome.toLowerCase().includes(termo) ||
+          p.codigo_barras?.includes(termo) ||
+          p.codigo_interno?.toLowerCase() === termo)
+    );
+  }, [ativos, busca, categoria]);
+
+  const adicionar = useCallback(
+    (produto: Produto, quantidade = 1) => {
+      const noCarrinho = carrinho.find((i) => i.produto_id === produto.id)?.quantidade ?? 0;
+      if (!permiteNegativo && (produto.estoque_atual ?? 0) < noCarrinho + quantidade) {
+        bip(false);
+        toast.error(`Estoque insuficiente para ${produto.nome}`);
+        return false;
+      }
+      setCarrinho((atual) => {
+        const existe = atual.find((i) => i.produto_id === produto.id);
+        if (existe) {
+          return atual.map((i) => (i.produto_id === produto.id ? { ...i, quantidade: i.quantidade + quantidade } : i));
+        }
+        return [
+          ...atual,
+          {
+            produto_id: produto.id,
+            nome: produto.nome,
+            preco: Number(produto.preco_venda ?? 0),
+            quantidade,
+            codigo_barras: produto.codigo_barras,
+            unidade: produto.unidade,
+          },
+        ];
+      });
+      return true;
+    },
+    [carrinho, permiteNegativo]
   );
 
-  const addToCart = (product: any) => {
-    // Check if we have enough stock
-    const currentProduct = products.find(p => p.id === product.id);
-    const existingCartItem = cart.find(item => item.id === product.id);
-    const currentCartQuantity = existingCartItem ? existingCartItem.quantity : 0;
-    
-    if (currentProduct && currentProduct.currentStock <= currentCartQuantity) {
-      toast.error(`Estoque insuficiente para ${product.name}`);
-      return;
-    }
-    
-    setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.id === product.id);
-      
-      if (existingItem) {
-        return prevCart.map(item => 
-          item.id === product.id 
-            ? { ...item, quantity: item.quantity + 1 } 
-            : item
-        );
-      } else {
-        return [...prevCart, { 
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          quantity: 1
-        }];
+  const lerCodigo = useCallback(
+    (codigo: string) => {
+      const produto = buscarPorCodigo(ativos, codigo);
+      if (!produto) {
+        bip(false);
+        toast.error(`Código não cadastrado: ${codigo}`);
+        return false;
       }
-    });
-  };
+      if (adicionar(produto)) {
+        bip(true);
+        toast.success(`${produto.nome} adicionado`, { duration: 1200 });
+      }
+      return true;
+    },
+    [ativos, adicionar]
+  );
 
-  const updateQuantity = (id: string, change: number) => {
-    const item = cart.find(item => item.id === id);
+  // Leitor BIP (USB/Bluetooth em modo teclado) funciona em qualquer lugar da tela
+  useBarcodeScanner({ onScan: lerCodigo, enabled: aba === "nova" && !checkoutAberto && !cameraAberta });
+
+  const alterarQuantidade = (produtoId: string, delta: number) => {
+    const produto = produtos.find((p) => p.id === produtoId);
+    const item = carrinho.find((i) => i.produto_id === produtoId);
     if (!item) return;
-    
-    const currentProduct = products.find(p => p.id === id);
-    
-    // Check if trying to increment beyond available stock
-    if (change > 0 && currentProduct && item.quantity >= currentProduct.currentStock) {
-      toast.error(`Estoque insuficiente para ${item.name}`);
+    if (delta > 0 && produto && !permiteNegativo && item.quantidade + delta > (produto.estoque_atual ?? 0)) {
+      toast.error(`Estoque insuficiente para ${item.nome}`);
       return;
     }
-    
-    setCart(prevCart => 
-      prevCart.map(item => 
-        item.id === id 
-          ? { ...item, quantity: Math.max(1, item.quantity + change) } 
-          : item
-      )
+    setCarrinho((atual) =>
+      atual.map((i) => (i.produto_id === produtoId ? { ...i, quantidade: Math.max(1, i.quantidade + delta) } : i))
     );
   };
 
-  const removeFromCart = (id: string) => {
-    setCart(prevCart => prevCart.filter(item => item.id !== id));
-  };
-
-  const clearCart = () => {
-    setCart([]);
-  };
-
-  const calculateTotal = () => {
-    return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
-  };
-  
-  const finalizeOrder = () => {
-    if (cart.length === 0) return;
-    
-    setIsProcessing(true);
-    
+  const confirmarVenda = async (r: ResultadoCheckout) => {
+    setProcessando(true);
     try {
-      // Check if we have enough stock for all items
-      const notEnoughStock = cart.some(item => {
-        const product = products.find(p => p.id === item.id);
-        return product ? product.currentStock < item.quantity : true;
+      const venda = await finalizarVenda({
+        barId,
+        itens: carrinho,
+        pagamentos: r.pagamentos,
+        desconto: r.desconto,
+        clienteCpf: r.clienteCpf,
+        origem: isMobile ? "mobile" : "pdv",
       });
-      
-      if (notEnoughStock) {
-        toast.error("Alguns produtos não têm estoque suficiente");
-        setIsProcessing(false);
-        return;
-      }
-      
-      // Update stock
-      const updatedProducts = products.map(product => {
-        const cartItem = cart.find(item => item.id === product.id);
-        if (cartItem) {
-          return {
-            ...product,
-            currentStock: product.currentStock - cartItem.quantity
-          };
+
+      setCarrinho([]);
+      setCheckoutAberto(false);
+      setCarrinhoAberto(false);
+      toast.success(
+        `Venda nº ${venda.numero} finalizada${venda.troco > 0 ? ` · Troco ${formatBRL(venda.troco)}` : ""}`
+      );
+      queryClient.invalidateQueries({ queryKey: ["produtos", barId] });
+      queryClient.invalidateQueries({ queryKey: ["vendas", barId] });
+
+      if (r.emitirNota) {
+        try {
+          const nota = await emitirNfce(venda.id);
+          if (nota.status === "autorizada") toast.success(`NFC-e nº ${nota.numero} autorizada`);
+          else toast.error(`NFC-e não autorizada: ${nota.mensagem ?? nota.status}. Reenvie pelo histórico.`);
+        } catch (e) {
+          toast.error(`${mensagemErro(e, "Erro ao emitir NFC-e")} A venda foi registrada; reenvie pelo histórico.`);
         }
-        return product;
-      });
-      
-      // Create new sale
-      const newSale = {
-        id: `s${sales.length + 1}`,
-        customer: "Cliente",
-        date: new Date(),
-        totalAmount: calculateTotal(),
-        items: cart.map(item => ({
-          id: `i${Math.random().toString(36).substring(2, 9)}`,
-          product: item.name,
-          quantity: item.quantity,
-          price: item.price,
-        }))
-      };
-      
-      // Update state
-      setProducts(updatedProducts);
-      setSales([newSale, ...sales]);
-      
-      toast.success("Venda finalizada com sucesso!");
-      clearCart();
+      }
+
+      if (r.imprimir) {
+        try {
+          const completa = await carregarVenda(venda.id);
+          await imprimirCupom(vendaParaCupom(completa, barAtivo!.bar, produtos));
+        } catch (e) {
+          toast.error(mensagemErro(e, "Falha ao imprimir o cupom"));
+        }
+      }
     } catch (error) {
-      toast.error("Erro ao finalizar venda");
-      console.error(error);
+      toast.error(mensagemErro(error, "Erro ao finalizar venda"));
+      queryClient.invalidateQueries({ queryKey: ["produtos", barId] });
     } finally {
-      setIsProcessing(false);
+      setProcessando(false);
     }
   };
 
+  const total = totalCarrinho(carrinho);
+  const qtdItens = carrinho.reduce((s, i) => s + i.quantidade, 0);
+  const podeHistorico = hasPermission("relatorios") || hasPermission("vendas_cancelar");
+
+  const carrinhoEl = (
+    <Carrinho
+      itens={carrinho}
+      onAlterarQuantidade={alterarQuantidade}
+      onRemover={(id) => setCarrinho((c) => c.filter((i) => i.produto_id !== id))}
+      onLimpar={() => setCarrinho([])}
+      onFinalizar={() => setCheckoutAberto(true)}
+      processando={processando}
+    />
+  );
+
   return (
     <Layout>
-      <div className="space-y-6">
-        <SlideInFromBottom>
-          <div>
-            <h2 className="text-3xl font-display font-semibold tracking-tight">Vendas</h2>
-            <p className="text-muted-foreground">
-              Registre vendas e gerencie seu caixa
-            </p>
-          </div>
-        </SlideInFromBottom>
-
-        <FadeIn>
-          <Tabs defaultValue="nova" className="w-full">
-            <TabsList className="w-full max-w-md mb-4">
-              <TabsTrigger value="nova" className="flex-1">
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Nova Venda
+      <Tabs value={aba} onValueChange={setAba} className="w-full">
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <h2 className="text-2xl sm:text-3xl font-display font-semibold tracking-tight">Vendas</h2>
+          {podeHistorico && (
+            <TabsList>
+              <TabsTrigger value="nova">
+                <ShoppingCart className="h-4 w-4 mr-2" /> PDV
               </TabsTrigger>
-              <TabsTrigger value="historico" className="flex-1">
-                <Receipt className="h-4 w-4 mr-2" />
-                Histórico
+              <TabsTrigger value="historico">
+                <Receipt className="h-4 w-4 mr-2" /> Histórico
               </TabsTrigger>
             </TabsList>
+          )}
+        </div>
 
-            <TabsContent value="nova" className="m-0">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2">
-                  <Card className="h-full">
-                    <div className="p-4 border-b">
-                      <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Buscar produtos..."
-                          className="pl-8"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <CardContent className="p-0 overflow-auto" style={{ maxHeight: '60vh' }}>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
-                        <StaggeredContainer className="contents" staggerDelay={0.05}>
-                          {filteredProducts.map(product => (
-                            <FadeIn key={product.id}>
-                              <Card 
-                                className={`hover:scale-[1.02] transition-transform overflow-hidden cursor-pointer h-full flex flex-col ${product.currentStock === 0 ? 'opacity-50' : ''}`}
-                                onClick={() => product.currentStock > 0 ? addToCart(product) : toast.error(`Sem estoque para ${product.name}`)}
-                              >
-                                <div className="h-24 bg-primary/10 flex items-center justify-center">
-                                  <ShoppingCart className="h-8 w-8 text-primary/70" />
-                                </div>
-                                <CardContent className="p-3 flex flex-col flex-grow">
-                                  <div className="space-y-1 flex-1">
-                                    <h3 className="font-medium text-sm leading-tight line-clamp-2">{product.name}</h3>
-                                    <div className="flex justify-between items-center mt-2">
-                                      <p className="text-sm font-semibold">R$ {product.price.toFixed(2)}</p>
-                                      <Badge 
-                                        variant={product.currentStock <= product.minimumStock ? "destructive" : "outline"}
-                                        className="text-xs"
-                                      >
-                                        {product.currentStock} un
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            </FadeIn>
-                          ))}
-                        </StaggeredContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
+        <TabsContent value="nova" className="m-0">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 space-y-3">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    data-barcode-input
+                    placeholder="Buscar ou bipar código..."
+                    className="pl-8 h-10"
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter" || !busca.trim()) return;
+                      e.preventDefault();
+                      // Enter com código exato = leitura do leitor com o campo focado
+                      if (buscarPorCodigo(ativos, busca)) {
+                        lerCodigo(busca);
+                        setBusca("");
+                      } else if (filtrados.length === 1) {
+                        if (adicionar(filtrados[0])) setBusca("");
+                      }
+                    }}
+                  />
                 </div>
-
-                <div className="lg:col-span-1">
-                  <Card className="h-full flex flex-col">
-                    <div className="p-4 border-b">
-                      <div className="flex justify-between items-center">
-                        <h3 className="font-display font-medium">Carrinho</h3>
-                        {cart.length > 0 && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={clearCart}
-                            className="h-8 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Limpar
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-
-                    <CardContent className="p-0 flex-1 overflow-auto" style={{ maxHeight: '40vh' }}>
-                      <div className="p-4">
-                        {cart.length > 0 ? (
-                          <div className="space-y-4">
-                            {cart.map(item => (
-                              <div key={item.id} className="flex justify-between items-center p-2 rounded-lg border">
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-sm truncate">{item.name}</p>
-                                  <p className="text-muted-foreground text-xs">R$ {item.price.toFixed(2)}</p>
-                                </div>
-                                <div className="flex items-center space-x-2 ml-2">
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    onClick={() => updateQuantity(item.id, -1)}
-                                  >
-                                    <MinusCircle className="h-4 w-4" />
-                                  </Button>
-                                  
-                                  <span className="text-sm w-5 text-center">{item.quantity}</span>
-                                  
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    onClick={() => updateQuantity(item.id, 1)}
-                                  >
-                                    <PlusCircle className="h-4 w-4" />
-                                  </Button>
-                                  
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon"
-                                    className="h-7 w-7 text-destructive hover:text-destructive"
-                                    onClick={() => removeFromCart(item.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center h-32 text-muted-foreground text-center gap-2">
-                            <ShoppingCart className="h-8 w-8 opacity-20" />
-                            <p>Carrinho vazio</p>
-                            <p className="text-xs">Adicione produtos clicando neles</p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-
-                    <div className="p-4 border-t mt-auto">
-                      <div className="space-y-4">
-                        <div className="flex justify-between text-lg font-semibold">
-                          <span>Total:</span>
-                          <span>R$ {calculateTotal().toFixed(2)}</span>
-                        </div>
-                        <Button 
-                          className="w-full" 
-                          size="lg"
-                          disabled={cart.length === 0 || isProcessing}
-                          onClick={finalizeOrder}
-                        >
-                          {isProcessing ? "Processando..." : "Finalizar Venda"}
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                </div>
+                <Button variant="outline" className="h-10 gap-2" onClick={() => setCameraAberta(true)}>
+                  <Camera className="h-4 w-4" />
+                  <span className="hidden sm:inline">Câmera</span>
+                </Button>
               </div>
-            </TabsContent>
 
-            <TabsContent value="historico" className="m-0">
-              <Card>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Cliente</TableHead>
-                        <TableHead>Data</TableHead>
-                        <TableHead>Itens</TableHead>
-                        <TableHead>Total</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <StaggeredContainer staggerDelay={0.05}>
-                        {sales.map((sale) => (
-                          <FadeIn key={sale.id}>
-                            <TableRow className="hover:bg-muted/30">
-                              <TableCell className="font-medium">{sale.customer}</TableCell>
-                              <TableCell>
-                                {new Date(sale.date).toLocaleDateString('pt-BR')}
-                              </TableCell>
-                              <TableCell>{sale.items.length}</TableCell>
-                              <TableCell className="font-semibold">
-                                R$ {sale.totalAmount.toFixed(2)}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                                  Concluída
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          </FadeIn>
-                        ))}
-                      </StaggeredContainer>
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </FadeIn>
-      </div>
+              {categorias.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                  <Button size="sm" variant={!categoria ? "default" : "outline"} onClick={() => setCategoria(null)}>
+                    Todos
+                  </Button>
+                  {categorias.map((c) => (
+                    <Button
+                      key={c}
+                      size="sm"
+                      variant={categoria === c ? "default" : "outline"}
+                      onClick={() => setCategoria(c)}
+                      className="shrink-0"
+                    >
+                      {c}
+                    </Button>
+                  ))}
+                </div>
+              )}
+
+              {isLoading ? (
+                <div className="py-12 text-center text-muted-foreground">Carregando produtos...</div>
+              ) : filtrados.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground flex flex-col items-center gap-2">
+                  <ScanBarcode className="h-8 w-8 opacity-40" />
+                  {ativos.length === 0 ? "Nenhum produto cadastrado. Cadastre em Estoque." : "Nenhum produto encontrado."}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
+                  {filtrados.map((p) => {
+                    const semEstoque = !permiteNegativo && (p.estoque_atual ?? 0) <= 0;
+                    const baixo = (p.estoque_atual ?? 0) <= (p.estoque_minimo ?? 0);
+                    const qtd = carrinho.find((i) => i.produto_id === p.id)?.quantidade;
+                    return (
+                      <Card
+                        key={p.id}
+                        role="button"
+                        className={`relative overflow-hidden cursor-pointer select-none active:scale-[0.98] transition-transform flex flex-col ${
+                          semEstoque ? "opacity-50" : ""
+                        }`}
+                        onClick={() => (semEstoque ? toast.error(`Sem estoque para ${p.nome}`) : adicionar(p))}
+                      >
+                        {qtd && (
+                          <span className="absolute top-1.5 right-1.5 z-10 h-6 min-w-6 px-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center">
+                            {qtd}
+                          </span>
+                        )}
+                        <div className="h-16 sm:h-20 bg-primary/10 flex items-center justify-center">
+                          {p.imagem_url ? (
+                            <img src={p.imagem_url} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <Wine className="h-7 w-7 text-primary/60" />
+                          )}
+                        </div>
+                        <div className="p-2 sm:p-3 flex flex-col flex-1 gap-1">
+                          <h3 className="font-medium text-sm leading-tight line-clamp-2 flex-1">{p.nome}</h3>
+                          <div className="flex justify-between items-center gap-1">
+                            <span className="text-sm font-semibold">{formatBRL(Number(p.preco_venda))}</span>
+                            <Badge variant={baixo ? "destructive" : "outline"} className="text-[10px] px-1.5">
+                              {p.estoque_atual ?? 0}
+                            </Badge>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {!isMobile && (
+              <Card className="lg:col-span-1 lg:sticky lg:top-20 h-[calc(100vh-7rem)] overflow-hidden">{carrinhoEl}</Card>
+            )}
+          </div>
+
+          {/* Barra do carrinho no celular */}
+          {isMobile && carrinho.length > 0 && (
+            <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-30 px-3 pb-2">
+              <Button size="lg" className="w-full h-14 justify-between text-base shadow-lg" onClick={() => setCarrinhoAberto(true)}>
+                <span className="flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5" /> {qtdItens} {qtdItens === 1 ? "item" : "itens"}
+                </span>
+                <span className="font-semibold">{formatBRL(total)}</span>
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+
+        {podeHistorico && (
+          <TabsContent value="historico" className="m-0">
+            <HistoricoVendas produtos={produtos} />
+          </TabsContent>
+        )}
+      </Tabs>
+
+      <Sheet open={isMobile && carrinhoAberto} onOpenChange={setCarrinhoAberto}>
+        <SheetContent side="bottom" className="h-[85vh] p-0 flex flex-col rounded-t-xl">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Carrinho</SheetTitle>
+          </SheetHeader>
+          {carrinhoEl}
+        </SheetContent>
+      </Sheet>
+
+      <CameraScanner open={cameraAberta} onOpenChange={setCameraAberta} onScan={lerCodigo} continuo titulo="Ler produtos" />
+
+      <CheckoutDialog
+        open={checkoutAberto}
+        onOpenChange={setCheckoutAberto}
+        subtotal={total}
+        podeEmitirNota={podeEmitir}
+        emitirNotaPadrao={!!configFiscal?.emitir_automaticamente}
+        imprimirPadrao={lerConfigImpressora().imprimirAutomatico}
+        processando={processando}
+        onConfirmar={confirmarVenda}
+      />
+
     </Layout>
   );
 };

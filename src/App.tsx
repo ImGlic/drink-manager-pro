@@ -11,10 +11,13 @@ import Index from "./pages/Index";
 import Estoque from "./pages/Estoque";
 import Vendas from "./pages/Vendas";
 import Configuracoes from "./pages/Configuracoes";
+import CadastroBar from "./pages/CadastroBar";
 import NotFound from "./pages/NotFound";
 
 // Create a client
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: true, retry: 1 } },
+});
 
 function App() {
   return (
@@ -24,6 +27,15 @@ function App() {
           <TooltipProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
+
+              <Route
+                path="/cadastro-bar"
+                element={
+                  <ProtectedRoute semBar>
+                    <CadastroBar />
+                  </ProtectedRoute>
+                }
+              />
               
               <Route 
                 path="/" 
@@ -55,7 +67,7 @@ function App() {
               <Route 
                 path="/configuracoes" 
                 element={
-                  <ProtectedRoute requiredPermission="configuracoes">
+                  <ProtectedRoute>
                     <Configuracoes />
                   </ProtectedRoute>
                 } 
