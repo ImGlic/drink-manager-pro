@@ -40,6 +40,17 @@ recarrega sozinho a cada 6h.
 As variáveis e secrets necessárias estão listadas no topo do `deploy.yml`; os jobs de Supabase e
 servidor só rodam quando `DEPLOY_SUPABASE` / `DEPLOY_SERVER` = `true`.
 
+### Modos de deploy no servidor (variável `DEPLOY_MODO`)
+
+| Modo | Quando usar | Como funciona |
+| --- | --- | --- |
+| `standalone` (padrão) | Servidor sem nada nas portas 80/443 | Nginx do container atende 80/443; certbot emite e renova o HTTPS |
+| `proxy` | Servidor já tem Nginx (ex.: outro site no mesmo servidor) | Container em `127.0.0.1:APP_PORT`; o Nginx do servidor faz o HTTPS. Configuração única em `deploy/nginx-servidor-meubar.conf` |
+
+**DNS / Cloudflare:** crie o registro do subdomínio apontando para o servidor e deixe como
+"somente DNS" (nuvem cinza) para a emissão do certificado. Se ligar o proxy da Cloudflare depois,
+use SSL "Full (strict)".
+
 ## Implantação no Supabase
 
 1. **Banco**: `npx supabase link --project-ref <ref>` e `npx supabase db push`
