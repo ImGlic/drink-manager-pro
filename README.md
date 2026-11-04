@@ -47,9 +47,10 @@ servidor só rodam quando `DEPLOY_SUPABASE` / `DEPLOY_SERVER` = `true`.
 | `standalone` (padrão) | Servidor sem nada nas portas 80/443 | Nginx do container atende 80/443; certbot emite e renova o HTTPS |
 | `proxy` | Servidor já tem Nginx (ex.: outro site no mesmo servidor) | Container em `127.0.0.1:APP_PORT`; o Nginx do servidor faz o HTTPS. Configuração única em `deploy/nginx-servidor-meubar.conf` |
 
-**DNS / Cloudflare:** crie o registro do subdomínio apontando para o servidor e deixe como
-"somente DNS" (nuvem cinza) para a emissão do certificado. Se ligar o proxy da Cloudflare depois,
-use SSL "Full (strict)".
+**DNS / Cloudflare:**
+- Modo `proxy` atrás da Cloudflare (servidor sem 443 público, como o homelab): registro com proxy
+  **ligado** (nuvem laranja). O HTTPS é entregue pela Cloudflare; não use certbot.
+- Modo `standalone`: registro "somente DNS" (nuvem cinza) para o certbot emitir o certificado.
 
 ## Implantação no Supabase
 
