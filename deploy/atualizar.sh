@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Executado no servidor pela pipeline (job "server").
 # Variáveis: IMAGE IMAGE_TAG DOMAIN LETSENCRYPT_EMAIL SUPABASE_URL SUPABASE_PUBLISHABLE_KEY GHCR_USER GHCR_TOKEN
+#            DEPLOY_MODO (standalone | proxy) APP_PORT (modo proxy, padrão 3080)
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -10,9 +11,17 @@ cd "$(dirname "$0")"
   echo "DOMAIN=${DOMAIN}"
   echo "SUPABASE_URL=${SUPABASE_URL}"
   echo "SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}"
+  echo "APP_PORT=${APP_PORT:-3080}"
 } > .env
 
-COMPOSE="docker compose -f docker-compose.prod.yml"
+# standalone: nginx do container nas portas 80/443 + certbot
+# proxy:      nginx do servidor na frente (container em 127.0.0.1:APP_PORT)
+MODO="${DEPLOY_MODO:-standalone}"
+if [ "$MODO" = "proxy" ]; then
+  COMPOSE="docker compose -f docker-compose.proxy.yml"
+else
+  COMPOSE="docker compose -f docker-compose.prod.yml"
+fi
 
 echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 $COMPOSE pull
@@ -30,6 +39,11 @@ if [ "$ok" != 1 ]; then
   echo "A aplicação não respondeu ao health check" >&2
   $COMPOSE logs --tail 50 web >&2
   exit 1
+fi
+
+if [ "$MODO" = "proxy" ]; then
+  echo "Deploy OK (modo proxy): container em 127.0.0.1:${APP_PORT:-3080} (imagem ${IMAGE_TAG})"
+  exit 0
 fi
 
 # Primeira subida: emite o certificado Let's Encrypt (renovação fica com o container certbot)

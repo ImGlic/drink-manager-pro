@@ -1,0 +1,14 @@
+# Produção ATRÁS DO NGINX DO SERVIDOR (quando o servidor já tem nginx nas portas 80/443,
+# como no servidor do fiiinfamilia.com.br). O container escuta só em 127.0.0.1:${APP_PORT}
+# e o nginx do servidor faz o HTTPS — ver deploy/nginx-servidor-meubar.conf.
+services:
+  web:
+    image: ${IMAGE}:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
+      DOMAIN: ${DOMAIN}
+      ENABLE_HTTPS: "false" # TLS no nginx do servidor
+    ports:
+      - "127.0.0.1:${APP_PORT:-3080}:80"
