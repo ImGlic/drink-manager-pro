@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Executado no servidor pela pipeline (job "server").
-# Espera as variáveis: IMAGE IMAGE_TAG DOMAIN SUPABASE_URL SUPABASE_PUBLISHABLE_KEY GHCR_USER GHCR_TOKEN
+# Variáveis: IMAGE IMAGE_TAG DOMAIN LETSENCRYPT_EMAIL SUPABASE_URL SUPABASE_PUBLISHABLE_KEY GHCR_USER GHCR_TOKEN
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -21,14 +21,26 @@ docker logout ghcr.io
 docker image prune -f
 
 # health check
+ok=0
 for _ in $(seq 1 20); do
-  if $COMPOSE exec -T web wget -qO- http://127.0.0.1/health >/dev/null 2>&1; then
-    echo "Deploy OK: https://${DOMAIN} (imagem ${IMAGE_TAG})"
-    exit 0
-  fi
+  if $COMPOSE exec -T web wget -qO- http://127.0.0.1/health >/dev/null 2>&1; then ok=1; break; fi
   sleep 3
 done
+if [ "$ok" != 1 ]; then
+  echo "A aplicação não respondeu ao health check" >&2
+  $COMPOSE logs --tail 50 web >&2
+  exit 1
+fi
 
-echo "A aplicação não respondeu ao health check" >&2
-$COMPOSE logs --tail 50 web >&2
-exit 1
+# Primeira subida: emite o certificado Let's Encrypt (renovação fica com o container certbot)
+if ! $COMPOSE exec -T web test -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"; then
+  echo "Emitindo certificado HTTPS para ${DOMAIN}..."
+  $COMPOSE run --rm --entrypoint certbot certbot certonly \
+    --webroot -w /var/www/certbot -d "${DOMAIN}" \
+    --email "${LETSENCRYPT_EMAIL}" --agree-tos --no-eff-email --non-interactive
+fi
+
+# Aponta o nginx para o certificado (se mudou) e recarrega
+$COMPOSE exec -T web sh -c '/usr/local/bin/certificado.sh || true; nginx -s reload'
+
+echo "Deploy OK: https://${DOMAIN} (imagem ${IMAGE_TAG})"

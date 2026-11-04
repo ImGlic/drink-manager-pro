@@ -1,6 +1,7 @@
 #!/bin/sh
 # Executado pelo entrypoint do nginx antes de iniciar.
 set -e
+CONF=/etc/nginx/conf.d/default.conf
 
 # 1) Configuração do frontend a partir das variáveis do container
 if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
@@ -14,21 +15,29 @@ window.__ENV__ = {
 JS
 
 # 2) URL pública (imagens de compartilhamento precisam de endereço absoluto)
-sed -i "s|__SITE_URL__|${SITE_URL:-}|g" /usr/share/nginx/html/index.html
+SITE_URL="${SITE_URL:-${DOMAIN:+https://$DOMAIN}}"
+sed -i "s|__SITE_URL__|${SITE_URL}|g" /usr/share/nginx/html/index.html
 
-# 3) HTTPS: usa certificado montado em /etc/nginx/certs ou gera um autoassinado
-#    (necessário para a câmera do celular na rede local).
-CERT_DIR=/etc/nginx/certs
+# 3) HTTPS
 if [ "$ENABLE_HTTPS" = "true" ]; then
-  mkdir -p "$CERT_DIR"
-  if [ ! -f "$CERT_DIR/cert.pem" ] || [ ! -f "$CERT_DIR/key.pem" ]; then
-    echo "Gerando certificado autoassinado para testes..."
-    openssl req -x509 -nodes -newkey rsa:2048 -days 825 \
-      -keyout "$CERT_DIR/key.pem" -out "$CERT_DIR/cert.pem" \
-      -subj "/CN=meu-bar" \
-      -addext "subjectAltName=DNS:localhost,IP:127.0.0.1${HOST_IP:+,IP:$HOST_IP}" >/dev/null 2>&1
+  /usr/local/bin/certificado.sh || true
+
+  # Produção: HTTP só responde ao Let's Encrypt e redireciona o resto para HTTPS
+  if [ "$FORCE_HTTPS" = "true" ]; then
+    sed -i '/# BEGIN HTTP_APP/,/# END HTTP_APP/d' "$CONF"
+    sed -i 's|# REDIRECT_HTTPS|location / { return 301 https://$host$request_uri; }|' "$CONF"
+  fi
+
+  # Recarrega o nginx periodicamente para pegar certificados novos/renovados pelo certbot
+  if [ -n "$CERT_RELOAD_INTERVAL" ]; then
+    (
+      while sleep "$CERT_RELOAD_INTERVAL"; do
+        /usr/local/bin/certificado.sh >/dev/null 2>&1 || true
+        nginx -s reload >/dev/null 2>&1 || true
+      done
+    ) &
   fi
 else
-  # sem HTTPS (ex.: atrás de um proxy como o Caddy em produção)
-  sed -i '/# BEGIN HTTPS/,/# END HTTPS/d' /etc/nginx/conf.d/default.conf
+  # sem HTTPS (ex.: atrás de outro proxy)
+  sed -i '/# BEGIN HTTPS/,/# END HTTPS/d' "$CONF"
 fi

@@ -31,9 +31,12 @@ container ao iniciar (`/config.js`), não ficam fixas no build.
   Edge Functions, migrations aplicadas num Postgres descartável e build da imagem.
 - **Deploy** (`.github/workflows/deploy.yml`, push na `main`): CI → imagem no GHCR →
   migrations + Edge Functions no Supabase → servidor via SSH com `docker compose`
-  (`deploy/docker-compose.prod.yml`) e Caddy com HTTPS automático.
+  (`deploy/docker-compose.prod.yml`): Nginx servindo HTTP/HTTPS e certbot
+  (Let's Encrypt) emitindo e renovando o certificado automaticamente.
 
 O servidor precisa apenas de Docker, portas 80/443 liberadas e um domínio apontando para ele.
+Na primeira subida o deploy emite o certificado; depois o container `certbot` renova e o Nginx
+recarrega sozinho a cada 6h.
 As variáveis e secrets necessárias estão listadas no topo do `deploy.yml`; os jobs de Supabase e
 servidor só rodam quando `DEPLOY_SUPABASE` / `DEPLOY_SERVER` = `true`.
 
@@ -49,7 +52,7 @@ servidor só rodam quando `DEPLOY_SUPABASE` / `DEPLOY_SERVER` = `true`.
    ```
    Guarde a `CERT_ENCRYPTION_KEY`: se ela mudar, os certificados precisam ser reenviados.
 3. **Funções**: `npx supabase functions deploy gerenciar-usuarios certificado-a1 nfce`
-4. **Frontend**: publique o `dist/` (Vercel, Netlify, Cloudflare Pages) com HTTPS — a câmera exige HTTPS.
+4. **Frontend**: pela pipeline (Docker + Nginx no servidor). HTTPS é obrigatório: a câmera exige.
 
 ## Módulos
 

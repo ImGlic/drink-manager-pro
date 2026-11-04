@@ -10,6 +10,7 @@ name: Deploy
 #     SUPABASE_URL                ex.: https://lbzfaurczxwigkrkuqet.supabase.co
 #     SUPABASE_PUBLISHABLE_KEY    chave sb_publishable_... (é pública)
 #     DOMAIN                      ex.: pdv.seudominio.com.br (DNS apontando para o servidor)
+#     LETSENCRYPT_EMAIL           e-mail para avisos do certificado HTTPS
 #   Secrets:
 #     SUPABASE_ACCESS_TOKEN       supabase.com > Account > Access Tokens
 #     SUPABASE_DB_PASSWORD        Project Settings > Database
@@ -101,7 +102,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
-          source: deploy/docker-compose.prod.yml,deploy/Caddyfile,deploy/atualizar.sh
+          source: deploy/docker-compose.prod.yml,deploy/atualizar.sh
           target: ~/meu-bar
           strip_components: 1
       - name: Atualizar containers
@@ -110,6 +111,7 @@ jobs:
           IMAGE: ${{ needs.image.outputs.image }}
           IMAGE_TAG: ${{ github.sha }}
           DOMAIN: ${{ vars.DOMAIN }}
+          LETSENCRYPT_EMAIL: ${{ vars.LETSENCRYPT_EMAIL }}
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
           GHCR_USER: ${{ github.actor }}
@@ -119,5 +121,5 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
-          envs: IMAGE,IMAGE_TAG,DOMAIN,SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,GHCR_USER,GHCR_TOKEN
+          envs: IMAGE,IMAGE_TAG,DOMAIN,LETSENCRYPT_EMAIL,SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,GHCR_USER,GHCR_TOKEN
           script: bash ~/meu-bar/atualizar.sh
