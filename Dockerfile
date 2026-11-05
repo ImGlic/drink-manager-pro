@@ -24,9 +24,8 @@ COPY --from=build /app/dist /usr/share/nginx/html
 #   ENABLE_HTTPS         serve HTTPS na 443 (autoassinado se não houver Let's Encrypt)
 #   FORCE_HTTPS          redireciona HTTP -> HTTPS (produção)
 #   CERT_RELOAD_INTERVAL recarrega o nginx periodicamente para pegar renovações (ex.: 6h)
-ENV SUPABASE_URL="" \
-    SUPABASE_PUBLISHABLE_KEY="" \
-    DOMAIN="" \
+#   SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY: definidas no docker compose (não ficam na imagem)
+ENV DOMAIN="" \
     ENABLE_HTTPS="true" \
     FORCE_HTTPS="false" \
     CERT_RELOAD_INTERVAL=""
