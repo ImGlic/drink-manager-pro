@@ -1,5 +1,6 @@
 # ---------- build ----------
-FROM node:22-alpine AS build
+# A etapa de build roda na arquitetura de quem compila (o resultado é só HTML/JS)
+FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
