@@ -47,11 +47,6 @@ servidor só rodam quando `DEPLOY_SUPABASE` / `DEPLOY_SERVER` = `true`.
 | `standalone` (padrão) | Servidor sem nada nas portas 80/443 | Nginx do container atende 80/443; certbot emite e renova o HTTPS |
 | `proxy` | Servidor já tem Nginx (ex.: outro site no mesmo servidor) | Container em `127.0.0.1:APP_PORT`; o Nginx do servidor faz o HTTPS. Configuração única em `deploy/nginx-servidor-meubar.conf` |
 
-**Alternativa sem container rodando (`deploy/publicar-estatico.sh`):** copia os arquivos da imagem
-pronta da pipeline (ou compila com `--local`) para `/var/www/meubar`, servidos direto pelo Nginx do
-servidor com `deploy/nginx-servidor-meubar-estatico.conf`. Para atualizar: `git pull && sudo ./publicar-estatico.sh`.
-A versão anterior fica em `/var/www/meubar.anterior`.
-
 **DNS / Cloudflare:**
 - Modo `proxy` atrás da Cloudflare (servidor sem 443 público, como o homelab): registro com proxy
   **ligado** (nuvem laranja). O HTTPS é entregue pela Cloudflare; não use certbot.
