@@ -9,7 +9,7 @@ RUN npm run build
 
 # ---------- runtime (nginx) ----------
 FROM nginx:stable-alpine
-# RUN apk upgrade --no-cache && apk add --no-cache openssl
+RUN apk upgrade --no-cache && apk add --no-cache openssl
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker/app.inc /etc/nginx/conf.d/app.inc
 COPY docker/40-config-runtime.sh /docker-entrypoint.d/40-config-runtime.sh
