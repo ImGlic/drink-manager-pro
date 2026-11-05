@@ -1,5 +1,8 @@
 # Produção: Nginx (na imagem do app) servindo HTTP/HTTPS + certbot (Let's Encrypt).
 # A pipeline copia este arquivo para ~/meu-bar no servidor e gera o .env.
+# nome fixo do projeto: evita conflito com outros apps que também tenham uma pasta "deploy"
+name: meu-bar
+
 services:
   web:
     image: ${IMAGE}:${IMAGE_TAG:-latest}
