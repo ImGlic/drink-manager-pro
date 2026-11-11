@@ -1,4 +1,5 @@
-# Ambiente de testes local.
+# Ambiente de testes LOCAL (seu computador). NÃO use no servidor:
+#   no servidor use deploy/docker-compose.proxy.yml (ou deploy/build-servidor.sh).
 #   docker compose up -d --build
 #   Computador: http://localhost:3080  (ou https://localhost:3443)
 #   Celular na mesma rede: https://<IP-do-computador>:3443  (aceite o aviso do certificado)

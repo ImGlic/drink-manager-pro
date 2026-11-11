@@ -1,3 +1,7 @@
+# Compatível com BuildKit e com o builder clássico (DOCKER_BUILDKIT=0), que não define
+# BUILDPLATFORM sozinho. No BuildKit o valor real da máquina substitui este padrão.
+ARG BUILDPLATFORM=linux/amd64
+
 # ---------- build ----------
 # A etapa de build roda na arquitetura de quem compila (o resultado é só HTML/JS)
 FROM --platform=$BUILDPLATFORM node:22-alpine AS build
